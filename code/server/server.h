@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/qcommon.h"
 #include "../game/g_public.h"
 #include "../game/bg_public.h"
+#include "qvmStructs.h"
 
 //=============================================================================
 
@@ -178,6 +179,13 @@ typedef struct client_s {
 	int				oldServerTime;
 	qboolean			csUpdated[MAX_CONFIGSTRINGS+1];	
 	int             numcmds;    // number of client commands so far (in this time period), for sv_floodprotect
+
+	// for anticamp
+	float		xlast;
+	float		ylast;
+	float		zlast;
+	int		timechecked;
+	int		campcounter;
 } client_t;
 
 //=============================================================================
@@ -305,6 +313,7 @@ extern	cvar_t	*sv_demonotice;
 extern  cvar_t  *sv_sayprefix;
 extern  cvar_t  *sv_tellprefix;
 extern  cvar_t  *sv_demofolder;
+extern cvar_t   *mod_punishCampers;
 
 #ifdef USE_AUTH
 extern	cvar_t	*sv_authServerIP;

@@ -62,12 +62,23 @@ cvar_t	*sv_demonotice;				// notice to print to a client being recorded server-s
 cvar_t  *sv_tellprefix;
 cvar_t  *sv_sayprefix;
 cvar_t 	*sv_demofolder;				//@Barbatos - the name of the folder that contains server-side demos
+cvar_t  *mod_punishCampers;
 
 //@Barbatos
 #ifdef USE_AUTH
 cvar_t	*sv_authServerIP;
 cvar_t  *sv_auth_engine;
 #endif
+
+const char versionString[vMAX][10] = {
+		"unknow",
+		"4.2.023",
+		"4.3",
+		"4.3.1",
+		"4.3.2",
+		"4.3.3",
+		"4.3.4"
+};
 
 /*
 =============================================================================
@@ -76,6 +87,17 @@ EVENT MESSAGES
 
 =============================================================================
 */
+
+/////////////////////////////////////////////////////////////////////
+// SV_GetClientTeam
+// Retrieve the team of the given client
+/////////////////////////////////////////////////////////////////////
+int SV_GetClientTeam(int cid) {
+    playerState_t *ps;
+    ps = SV_GameClientNum(cid);
+    team_t team = *(int*)((void*)ps+gclientOffsets[getVersion()][OFFSET_TEAM]);
+    return team;
+}
 
 /*
 ===============

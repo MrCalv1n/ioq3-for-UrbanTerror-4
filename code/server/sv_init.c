@@ -934,7 +934,8 @@ void SV_Init (void) {
 	sv_sayprefix = Cvar_Get ("sv_sayprefix", "console: ", CVAR_ARCHIVE );	
 	sv_tellprefix = Cvar_Get ("sv_tellprefix", "console_tell: ", CVAR_ARCHIVE );
 	sv_demofolder = Cvar_Get ("sv_demofolder", "serverdemos", CVAR_ARCHIVE );
-	
+	mod_punishCampers = Cvar_Get("mod_punishCampers", "0", CVAR_ARCHIVE);
+
 	#ifdef USE_AUTH
 	sv_authServerIP = Cvar_Get("sv_authServerIP", "", CVAR_TEMP | CVAR_ROM);
 	sv_auth_engine = Cvar_Get("sv_auth_engine", "1", CVAR_ROM);

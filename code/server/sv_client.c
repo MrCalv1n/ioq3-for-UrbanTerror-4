@@ -1516,6 +1516,97 @@ static qboolean SV_ClientCommand( client_t *cl, msg_t *msg ) {
 	return qtrue;		// continue procesing
 }
 
+/*
+==================
+Anti camp stuff
+==================
+*/
+
+int checkCamperLocation( client_t *cl, playerState_t *ps, float r) {
+    if (ps->origin[0] > cl->xlast-r &&
+        ps->origin[0] < cl->xlast+r &&
+        ps->origin[1] > cl->ylast-r &&
+        ps->origin[1] < cl->ylast+r &&
+        ps->origin[2] > cl->zlast-r &&
+        ps->origin[2] < cl->zlast+r
+        ) {
+        return 1;
+    }
+	return 0;
+}
+
+void acceleratedSlap (client_t *cl, playerState_t *ps) {
+	Cmd_ExecuteString(va("slap %s", cl->name));
+	int vel0 = ps->velocity[0];
+	int vel1 = ps->velocity[1];
+	int vel2 = ps->velocity[2];
+    ps->velocity[0] = vel0 *= 2;
+	ps->velocity[1] = vel1 *= 2;
+	ps->velocity[2] = vel2 *= 2;
+}
+
+void setCampCoords (client_t *cl, playerState_t *ps) {
+	cl->xlast = ps->origin[0];
+	cl->ylast = ps->origin[1];
+	cl->zlast = ps->origin[2];
+}
+
+void checkCampers (client_t *cl) {
+	int cid;
+    	cid = cl - svs.clients;
+
+	// Don't check bots, let them camp
+	if (cl->gentity->r.svFlags & SVF_BOT) {
+		return;
+	}
+
+	// Don't check spectators
+	if (SV_GetClientTeam(cid) == TEAM_SPECTATOR) {
+		return;
+	}
+	
+	unsigned int time = Com_Milliseconds();
+	playerState_t *ps;
+	ps = SV_GameClientNum(cl - svs.clients);
+
+	// This is the first check
+	if (cl->xlast == 0 && cl->ylast == 0 && cl->zlast == 0) {
+		setCampCoords(cl, ps);
+		cl->timechecked = time;
+	} else {
+		// Now check if 15 seconds have passed since the 1st check, if so do a proximity check
+		// 45 seconds in total is plenty of time for a player to move an and not camp in the same area for too long
+		if ((time - cl->timechecked) > 10000) {
+			cl->timechecked = time;
+			// 10 seconds have passed since the last check
+			if (checkCamperLocation(cl, ps, 400) == 1) {
+				// Client is still within his previous radius, 
+				if (cl->campcounter == 3) {
+					// If the client is dead
+					if (ps->pm_type != PM_NORMAL) {
+						cl->campcounter = 0;
+						return;
+					}
+					// punish now
+					acceleratedSlap(cl, ps);
+					acceleratedSlap(cl, ps);
+					acceleratedSlap(cl, ps);
+					acceleratedSlap(cl, ps);
+					
+					cl->campcounter = 0;
+					Cmd_ExecuteString(va("bigtext \"^5%s ^3was caught\n^1Camping!\"", cl->name));
+				} else {
+					cl->campcounter++;
+				}
+			} else {
+				// set his new coordinates as the camper has moved on
+				// reset the camp counter
+				setCampCoords(cl, ps);
+				cl->campcounter = 0;
+			}
+		}
+	}
+}
 
 //==================================================================================
 
@@ -1528,13 +1619,20 @@ Also called by bot code
 ==================
 */
 void SV_ClientThink (client_t *cl, usercmd_t *cmd) {
+	playerState_t *ps;
 	cl->lastUsercmd = *cmd;
 
 	if ( cl->state != CS_ACTIVE ) {
 		return;		// may have been kicked during the last usercmd
 	}
 
+	ps = SV_GameClientNum(cl - svs.clients);
+
 	VM_Call( gvm, GAME_CLIENT_THINK, cl - svs.clients );
+
+	if (mod_punishCampers->integer) {
+	checkCampers(cl);
+	}
 }
 
 /*

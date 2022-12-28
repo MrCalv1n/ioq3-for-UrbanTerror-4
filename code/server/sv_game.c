@@ -1023,3 +1023,18 @@ qboolean SV_GameCommand( void ) {
 	return VM_Call( gvm, GAME_CONSOLE_COMMAND );
 }
 
+/*
+====================
+getVersion
+====================
+*/
+urtVersion getVersion(void)
+{
+	int i;
+	for(i = 0; i < vMAX; i++)
+	{
+		if(!strcmp(Cvar_VariableString("g_modversion"), versionString[i]))
+			return i;
+	}
+	return vunk;
+}
