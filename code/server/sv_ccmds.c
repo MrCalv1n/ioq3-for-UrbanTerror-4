@@ -270,7 +270,7 @@ static int SV_Argc_to_idnum( int arg_num ) {
 	}
 
 	search = Cmd_Argv( arg_num );
-	
+
 	if(strlen( search ) < 3 )
 	{
 		for (i = 0; search[i]; i++) {
@@ -314,29 +314,29 @@ static int SV_Argc_to_idnum( int arg_num ) {
 									f++;
 								}
 							}
-							if (f==slen) { 
-								count++; 
-								idnum = i; 
-								break; 
+							if (f==slen) {
+								count++;
+								idnum = i;
+								break;
 							}
 						}
 					}
 				}
 			}
 		}
-		if( count == 1 ) { 
+		if( count == 1 ) {
 			return idnum;
 		}
-		if( count > 0 ) { 
+		if( count > 0 ) {
 			Com_Printf( "Too many players found for \"%s\".\n", search );
 			return -1;
 		}
-		if( count == 0 ) { 
+		if( count == 0 ) {
 			Com_Printf( "No player found for \"%s\".\n", search );
 			return -1;
 		}
 	}
-	
+
 	return -1;
 }*/
 #endif
@@ -370,7 +370,7 @@ static int QDECL SV_SortMaps(const void *a, const void *b) {
 // Description : Retrieve a full map name given a substring of it
 // Author      : Fenix, p5yc0runn3r
 /////////////////////////////////////////////////////////////////////
-static char *SV_GetMapSoundingLike(const char *s) 
+static char *SV_GetMapSoundingLike(const char *s)
 {
     int  i, mapcount;
     int  len = 0, count = 0;
@@ -381,7 +381,7 @@ static char *SV_GetMapSoundingLike(const char *s)
     // [BUGFIX]: instead of iterating through all the maps matching both full and
     // partial name, search just for the exact map name and return it if the match is found
     Com_sprintf(maplist, sizeof(maplist), "maps/%s.bsp", s);
-    if (FS_ReadFile(maplist, NULL) > 0) 
+    if (FS_ReadFile(maplist, NULL) > 0)
     {
         Com_sprintf(maplist, sizeof(maplist), "%s", s);
         return maplist; // @p5yc0runn3r: Return static string
@@ -389,19 +389,19 @@ static char *SV_GetMapSoundingLike(const char *s)
 
     // We didn't found an exact name match. Keep iterating through all the
     // available maps matching partial substrings
-    if (!(mapcount = FS_GetFileList("maps", ".bsp", maplist, sizeof(maplist)))) 
+    if (!(mapcount = FS_GetFileList("maps", ".bsp", maplist, sizeof(maplist))))
     {
         Com_Printf("Unable to retrieve map list\n");
         return NULL;
     }
 
-    for (searchmap = maplist, i = 0; i < mapcount && count < MAX_MAPLIST_SIZE; i++, searchmap += len + 1) 
+    for (searchmap = maplist, i = 0; i < mapcount && count < MAX_MAPLIST_SIZE; i++, searchmap += len + 1)
     {
         len = strlen(searchmap);
         SV_StripExtension(searchmap, searchmap);
 
         // Check for substring match
-        if (Q_strisub(searchmap, s)) 
+        if (Q_strisub(searchmap, s))
         {
             matches[count] = searchmap;
             count++;
@@ -411,7 +411,7 @@ static char *SV_GetMapSoundingLike(const char *s)
     // One match = one map, found match.
     if (count == 1) return matches[0]; // @p5yc0runn3r: matches points to static string, safe to return.
 
-    if (count > 1) 
+    if (count > 1)
     {
         // Multiple matches found for the given map name
         Com_Printf("Multiple maps found matching '%s':\n", s);
@@ -419,13 +419,13 @@ static char *SV_GetMapSoundingLike(const char *s)
         // Sorting the short map list alphabetically
         qsort(matches, count, sizeof(char *), SV_SortMaps);
 
-        for (i = 0; i < count; i++) 
+        for (i = 0; i < count; i++)
         {
             // Printing a short map list so the user can retry with a more specific name
             Com_Printf(" %2d: [%s]\n", i + 1, matches[i]);
         }
 
-        if (count >= MAX_MAPLIST_SIZE) 
+        if (count >= MAX_MAPLIST_SIZE)
         {
             // Tell the user that there are actually more
             // maps matching the given substring, although
@@ -572,7 +572,7 @@ static void SV_MapRestart_f( void ) {
 	// map_restart has happened
 	svs.snapFlagServerBit ^= SNAPFLAG_SERVERCOUNT;
 
-	// generate a new serverid	
+	// generate a new serverid
 	// TTimo - don't update restartedserverId there, otherwise we won't deal correctly with multiple map_restart
 	sv.serverId = com_frameTime;
 	Cvar_Set( "sv_serverid", va("%i", sv.serverId ) );
@@ -643,7 +643,7 @@ static void SV_MapRestart_f( void ) {
 		 	// which is wrong obviously.
 		 	SV_ClientEnterWorld(client, NULL);
 		}
-	}	
+	}
 
 	// run another frame to allow things to look at all the players
 	VM_Call (gvm, GAME_RUN_FRAME, sv.time);
@@ -1518,6 +1518,35 @@ static void SV_StartServerDemo_f(void) {
     }
 }
 
+static void SV_GetLocation(void) {
+    client_t        *cl;
+    playerState_t   *ps;
+
+    if (!com_sv_running->integer) {
+            Com_Printf("Server is not running\n");
+            return;
+    }
+
+    if (Cmd_Argc() != 2) {
+            Com_Printf("Usage: get-location <player>\n");
+            return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        Com_Printf("Invalid player.\n");
+        return;
+    }
+
+    // Getting the playerstate
+    ps = SV_GameClientNum(cl - svs.clients);
+
+    // print a player's position
+
+	SV_SendServerCommand(cl, "chat \"%f,%f,%f\"", ps->origin[0], ps->origin[1], ps->origin[2]);
+
+}
+
 /*
 ==================
 SV_StopServerDemo_f
@@ -1588,6 +1617,7 @@ void SV_AddOperatorCommands( void ) {
     initialized = qtrue;
 
     Cmd_AddCommand ("heartbeat", SV_Heartbeat_f);
+    Cmd_AddCommand ("get-location", SV_GetLocation);
     Cmd_AddCommand ("kick", SV_Kick_f);
     Cmd_AddCommand ("banUser", SV_Ban_f);
     Cmd_AddCommand ("banClient", SV_BanNum_f);
