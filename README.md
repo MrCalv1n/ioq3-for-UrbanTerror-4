@@ -1,7 +1,7 @@
 *************************************************************************************************************************
 # Changes
 
-- get-location feature
+- anti-camper feature
 
 Special thanks to donna30urt for his help.
 
