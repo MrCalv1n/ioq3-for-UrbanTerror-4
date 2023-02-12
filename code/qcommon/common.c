@@ -39,7 +39,7 @@ int demo_protocols[] =
 #define MIN_DEDICATED_COMHUNKMEGS 96
 #define MIN_COMHUNKMEGS		512
 #define DEF_COMHUNKMEGS		512 //@Barbatos - previously 256
-#define DEF_COMZONEMEGS		32 //@Barbatos - previously 24
+#define DEF_COMZONEMEGS		48 //@Barbatos - previously 24
 #define XSTRING(x)				STRING(x)
 #define STRING(x)					#x
 #define DEF_COMHUNKMEGS_S	XSTRING(DEF_COMHUNKMEGS)
@@ -81,6 +81,7 @@ cvar_t  *cl_packetdelay;
 cvar_t  *sv_packetdelay;
 cvar_t	*com_cameraMode;
 cvar_t 	*com_logfileName;
+cvar_t  *mod_contraband;
 
 qboolean dev = qfalse;
 
@@ -105,6 +106,11 @@ char	com_errorMessage[MAXPRINTMSG];
 void Com_WriteConfig_f( void );
 void CIN_CloseAllVideos( void );
 
+void EV_PlayerSpawn (int cnum);
+void EV_ClientUserInfoChanged(int cnum);
+void EV_ClientConnect(int cnum);
+void EV_ClientDisconnect(int cnum);
+void EV_ClientBegin(int cnum);
 //============================================================================
 
 static char	*rd_buffer;
@@ -146,12 +152,33 @@ A raw string should NEVER be passed as fmt, because of "%f" type crashers.
 void QDECL Com_Printf( const char *fmt, ... ) {
 	va_list		argptr;
 	char		msg[MAXPRINTMSG];
-  static qboolean opening_qconsole = qfalse;
-
+    static qboolean opening_qconsole = qfalse;
+    int cnum, target;
 
 	va_start (argptr,fmt);
 	Q_vsnprintf (msg, sizeof(msg), fmt, argptr);
 	va_end (argptr);
+
+	if(sscanf(msg, "ClientSpawn: %d", &cnum))
+	{
+		EV_PlayerSpawn(cnum);
+	}
+	if(sscanf(msg, "ClientUserinfoChanged: %d", &cnum))
+	{
+		EV_ClientUserInfoChanged(cnum);
+	}
+	if(sscanf(msg, "ClientConnect: %d", &cnum))
+	{
+		EV_ClientConnect(cnum);
+	}
+	if(sscanf(msg, "ClientDisconnect: %d", &cnum))
+	{
+		EV_ClientDisconnect(cnum);
+	}
+	if(sscanf(msg, "ClientBegin: %d", &cnum))
+	{
+		EV_ClientBegin(cnum);
+	}
 
 	if ( rd_buffer ) {
 		if ((strlen (msg) + strlen(rd_buffer)) > (rd_buffersize - 1)) {
@@ -193,7 +220,9 @@ void QDECL Com_Printf( const char *fmt, ... ) {
 			
 			if(logfile)
 			{
-				Com_Printf( "logfile opened on %s\n", asctime( newtime ) );
+				Com_Printf( "-----------------------------------------------------------\n");
+				Com_Printf( "[OK] Logfile opened on: %s", asctime( newtime ) );
+				Com_Printf( "-----------------------------------------------------------\n\n");
 			
 				if ( com_logfile->integer > 1 )
 				{
@@ -2471,7 +2500,7 @@ void Com_Init( char *commandLine ) {
 	// init commands and vars
 	//
 	com_altivec = Cvar_Get ("com_altivec", "1", CVAR_ARCHIVE);
-	com_maxfps = Cvar_Get ("com_maxfps", "85", CVAR_ARCHIVE);
+	com_maxfps = Cvar_Get ("com_maxfps", "125", CVAR_ARCHIVE);
 	com_blood = Cvar_Get ("com_blood", "1", CVAR_ARCHIVE);
 
 	com_developer = Cvar_Get ("developer", "0", CVAR_TEMP );
@@ -2497,6 +2526,8 @@ void Com_Init( char *commandLine ) {
 
 	com_introPlayed = Cvar_Get( "com_introplayed", "0", CVAR_ARCHIVE);
 
+	mod_contraband = Cvar_Get( "mod_contraband", "0", CVAR_ARCHIVE);
+
 #if defined(_WIN32) && defined(_DEBUG)
 	com_noErrorInterrupt = Cvar_Get( "com_noErrorInterrupt", "0", 0 );
 #endif
@@ -2516,7 +2547,7 @@ void Com_Init( char *commandLine ) {
 	Cmd_AddCommand ("changeVectors", MSG_ReportChangeVectors_f );
 	Cmd_AddCommand ("writeconfig", Com_WriteConfig_f );
 
-	s = va("%s %s %s", Q3_VERSION, PLATFORM_STRING, __DATE__ );
+	s = va("%s", Q3_VERSION);
 	com_version = Cvar_Get ("version", s, CVAR_ROM | CVAR_SERVERINFO );
 
 	Sys_Init();
@@ -3309,3 +3340,39 @@ void Com_RandomBytes( byte *string, int len )
 		string[i] = (unsigned char)( rand() % 255 );
 }
 
+/*
+ * Replace function
+ *
+ */
+void str_replace(char *target, const char *needle, const char *replacement, int destsize)
+{
+	char buffer[1024] = { 0 };
+	char *insert_point = &buffer[0];
+	const char *tmp = target;
+	size_t needle_len = strlen(needle);
+	size_t repl_len = strlen(replacement);
+
+	while (1) {
+		const char *p = strstr(tmp, needle);
+
+		// walked past last occurrence of needle; copy remaining part
+		if (p == NULL) {
+			strcpy(insert_point, tmp);
+			break;
+		}
+
+		// copy part before needle
+		memcpy(insert_point, tmp, p - tmp);
+		insert_point += p - tmp;
+
+		// copy replacement string
+		memcpy(insert_point, replacement, repl_len);
+		insert_point += repl_len;
+
+		// adjust pointers, move on
+		tmp = p + needle_len;
+	}
+
+	// write altered string back to target
+	strncpy(target, buffer, destsize);
+}

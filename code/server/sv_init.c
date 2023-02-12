@@ -22,6 +22,50 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "server.h"
 
+/////////////////////////////////////////////////////////////////////
+// SV_SendCustomConfigString
+/////////////////////////////////////////////////////////////////////
+void SV_SendCustomConfigString(client_t *client, char *cs, int index)
+{
+	int maxChunkSize = MAX_STRING_CHARS - 24;
+	int len;
+
+	if(client->state != CS_ACTIVE)
+		return;
+
+	len = strlen(cs);
+
+	if( len >= maxChunkSize ) {
+		int		sent = 0;
+		int		remaining = len;
+		char	*cmd;
+		char	buf[MAX_STRING_CHARS];
+
+		while (remaining > 0 ) {
+			if ( sent == 0 ) {
+				cmd = "bcs0";
+			}
+			else if( remaining < maxChunkSize ) {
+				cmd = "bcs2";
+			}
+			else {
+				cmd = "bcs1";
+			}
+			Q_strncpyz( buf, &cs[sent],
+				maxChunkSize );
+
+			SV_SendServerCommand( client, "%s %i \"%s\"\n", cmd,
+				index, buf );
+
+			sent += (maxChunkSize - 1);
+			remaining -= (maxChunkSize - 1);
+		}
+	} else {
+		// standard cs, just send it
+		SV_SendServerCommand( client, "cs %i \"%s\"\n", index,
+			cs);
+	}
+}
 
 /*
 ===============
@@ -176,19 +220,25 @@ SV_SetUserinfo
 ===============
 */
 void SV_SetUserinfo( int index, const char *val ) {
-	if ( index < 0 || index >= sv_maxclients->integer ) {
+    gclient_t *gl;
+    
+    if ( index < 0 || index >= sv_maxclients->integer ) {
 		Com_Error (ERR_DROP, "SV_SetUserinfo: bad index %i\n", index);
 	}
 
 	if ( !val ) {
 		val = "";
 	}
-
+        
+    gl = (gclient_t *)SV_GameClientNum(index);
 	Q_strncpyz( svs.clients[index].userinfo, val, sizeof( svs.clients[ index ].userinfo ) );
 	Q_strncpyz( svs.clients[index].name, Info_ValueForKey( val, "name" ), sizeof(svs.clients[index].name) );
+
+    if (mod_colourNames->integer) {
+	    if(svs.clients[index].colourName[0])
+		    Q_strncpyz(gl->pers.netname, va("%s^7", svs.clients[index].colourName), MAX_NETNAME);
+    }
 }
-
-
 
 /*
 ===============
@@ -203,6 +253,12 @@ void SV_GetUserinfo( int index, char *buffer, int bufferSize ) {
 	if ( index < 0 || index >= sv_maxclients->integer ) {
 		Com_Error (ERR_DROP, "SV_GetUserinfo: bad index %i\n", index);
 	}
+
+	// get the client's cg_ghost value if we are in jump mode
+	if (sv_gametype->integer == GT_JUMP) {
+        svs.clients[index].cm.ghost = SV_IsClientGhost(&svs.clients[index]);
+    }
+
 	Q_strncpyz( buffer, svs.clients[ index ].userinfo, bufferSize );
 }
 
@@ -533,7 +589,7 @@ int SV_MakeCompressedPureList( void )
     if (ol==sizeof(tmp)-1) {
      tmp[ol]=0;
      if (csnr==PURE_COMPRESS_NUMCS) {
-      Com_Printf(err_chunk);
+      Com_Printf("%s", err_chunk);
       return 1;
      }
      SV_SetConfigstring( MAX_CONFIGSTRINGS-PURE_COMPRESS_NUMCS+csnr, tmp);
@@ -548,7 +604,7 @@ int SV_MakeCompressedPureList( void )
    if (ol==sizeof(tmp)-1) {
     tmp[ol]=0;
     if (csnr==PURE_COMPRESS_NUMCS) {
-     Com_Printf(err_chunk);
+     Com_Printf("%s", err_chunk);
      return 1;
     }
     SV_SetConfigstring( MAX_CONFIGSTRINGS-PURE_COMPRESS_NUMCS+csnr, tmp);
@@ -567,7 +623,7 @@ int SV_MakeCompressedPureList( void )
    if (ol==sizeof(tmp)-1) {
     tmp[ol]=0;
     if (csnr==PURE_COMPRESS_NUMCS) {
-     Com_Printf(err_chunk);
+     Com_Printf("%s", err_chunk);
      return 1;
     }
     SV_SetConfigstring( MAX_CONFIGSTRINGS-PURE_COMPRESS_NUMCS+csnr, tmp);
@@ -582,7 +638,7 @@ int SV_MakeCompressedPureList( void )
  }
  if (ol) {
   if (csnr==PURE_COMPRESS_NUMCS) {
-   Com_Printf(err_chunk);
+   Com_Printf("%s", err_chunk);
    return 1;
   }
   tmp[ol]=0;
@@ -606,7 +662,11 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 	int			checksum;
 	qboolean	isBot;
 	char		systemInfo[16384];
+	char        mapname[MAX_QPATH];
 	const char	*p;
+
+	// save the mapname (the old level) here because it's nuked later
+    Q_strncpyz(mapname, sv_mapname->string, sizeof(mapname));
 
 	// shut down the existing game if it is running
 	SV_ShutdownGameProgs();
@@ -703,6 +763,7 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 	// load and spawn all other entities
 	SV_InitGameProgs();
 
+
 	// don't allow a map_restart if game is modified
 	sv_gametype->modified = qfalse;
 
@@ -746,6 +807,19 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 				SV_DropClient( &svs.clients[i], denied );
 			} else {
 				if( !isBot ) {
+                    // save the client position to a file
+                    SV_SavePositionToFile(&svs.clients[i], mapname);
+
+                    // clear the saved position vector for nextmap
+                    VectorClear(svs.clients[i].cm.savedPosition);
+
+                    // set stamina and walljumps back to default
+                    svs.clients[i].cm.infiniteStamina = 0;
+                    svs.clients[i].cm.infiniteWallJumps = 0;
+
+                    // load the client saved position from a file
+                    SV_LoadPositionFromFile(&svs.clients[i], sv_mapname->string);
+
 					// when we get the next packet from a connected client,
 					// the new gamestate will be sent
 					svs.clients[i].state = CS_CONNECTED;
@@ -860,7 +934,83 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 
 	Hunk_SetMark();
 
-	Com_Printf ("-----------------------------------\n");
+	if (mod_1v1arena -> integer) {
+		Com_Printf ("-----------------------------------\n");
+
+		vec3_t defaultSpawns[20] = {
+			{-72, 5264, 160},
+			{-24, 5264, 160},
+			{24, 5264, 160},
+			{72, 5264, 160},
+			{144, 5240, 160},
+			{144, 5192, 160},
+			{144, 5144, 160},
+			{144, 5096, 160},
+			{144, 5048, 160},
+			{144, 5000, 160},
+			{-72, 4976, 160},
+			{-24, 4976, 160},
+			{24, 4976, 160},
+			{72, 4976, 160},
+			{-144, 5240, 160},
+			{-144, 5192, 160},
+			{-144, 5144, 160},
+			{-144, 5096, 160},
+			{-144, 5048, 160},
+			{-144, 5000, 160}
+		};
+		for (i = 0; i < 20; i++) {
+			VectorCopy(defaultSpawns[i], sv.defaultSpawns[i]);
+		}
+		Com_Printf("[Arena] Default spawns loaded\n");
+
+		vec3_t p1spawns[12] = {
+			{-3488, 2560, 224},
+			{-928, 2560, 224},
+			{1632, 2560, 224},
+			{-3488, 0, 224},
+			{-928, 0, 224},
+			{1632, 0, 224},
+			{-3488, -2560, 224},
+			{-928, -2560, 224},
+			{1632, -2560, 224},
+			{-3488, -5120, 224},
+			{-928, -5120, 224},
+			{1632, -5120, 224}
+		};
+
+		vec3_t p2spawns[12] = {
+			{-1632, 2560, 224},
+			{928, 2560, 224},
+			{3488, 2560, 224},
+			{-1632, 0, 224},
+			{928, 0, 224},
+			{3488, 0, 224},
+			{-1632, -2560, 224},
+			{928, -2560, 224},
+			{3488, -2560, 224},
+			{-1632, -5120, 224},
+			{928, -5120, 224},
+			{3488, -5120, 224}
+		};
+
+		Com_Printf("[Arena] Individual arena spawns loaded\n");
+
+		for (int i = 0; i < MAX_1V1_ARENAS; i++) {
+			VectorCopy(p1spawns[i], sv.Arenas[i].spawn1);
+			VectorCopy(p2spawns[i], sv.Arenas[i].spawn2);
+			sv.Arenas[i].player1num = 99;
+			sv.Arenas[i].player2num = 99;
+			sv.Arenas[i].population = 0;
+		}
+		sv.doTeleportTime = 0;
+		sv.doneTp = qtrue;
+		sv.doSmite = 0;
+		sv.doneSmite = qtrue;
+
+		Com_Printf("[Arena] Fully initialized\n");
+		Com_Printf ("-----------------------------------\n");
+	}
 }
 
 /*
@@ -930,11 +1080,98 @@ void SV_Init (void) {
 	sv_strictAuth = Cvar_Get ("sv_strictAuth", "1", CVAR_ARCHIVE );
 
 	sv_demonotice = Cvar_Get ("sv_demonotice", "Smile! You're on camera!", CVAR_ARCHIVE);
-	
 	sv_sayprefix = Cvar_Get ("sv_sayprefix", "console: ", CVAR_ARCHIVE );	
 	sv_tellprefix = Cvar_Get ("sv_tellprefix", "console_tell: ", CVAR_ARCHIVE );
 	sv_demofolder = Cvar_Get ("sv_demofolder", "serverdemos", CVAR_ARCHIVE );
+
+	// TitanMod cvars
+	mod_infiniteStamina = Cvar_Get ("mod_infiniteStamina", "0", CVAR_ARCHIVE);
+	mod_infiniteWallJumps = Cvar_Get ("mod_infiniteWallJumps", "0", CVAR_ARCHIVE);
+	mod_nofallDamage = Cvar_Get("mod_nofallDamage", "1", CVAR_ARCHIVE);
+	
+	mod_colourNames = Cvar_Get ("mod_colourNames", "1", CVAR_ARCHIVE);
+        
+	mod_playerCount = Cvar_Get ("mod_playerCount", "0", CVAR_ARCHIVE);
+    mod_botsCount = Cvar_Get ("mod_botsCount", "1", CVAR_ARCHIVE);
+	mod_mapName = Cvar_Get("mod_mapName", "", CVAR_ARCHIVE);
+	mod_mapColour = Cvar_Get("mod_mapColour", "7", CVAR_ARCHIVE);
+	mod_hideCmds = Cvar_Get ("mod_hideCmds", "1", CVAR_ARCHIVE);
+	mod_infiniteAmmo = Cvar_Get("mod_infiniteAmmo", "0", CVAR_ARCHIVE);
+	mod_forceGear = Cvar_Get ("mod_forceGear", "", CVAR_ARCHIVE);
+	mod_checkClientGuid = Cvar_Get ("mod_checkClientGuid", "1", CVAR_ARCHIVE);
+	mod_disconnectMsg = Cvar_Get ("mod_disconnectMsg", "disconnected", CVAR_ARCHIVE);
+	mod_badRconMessage = Cvar_Get ("mod_badRconMessage", "Bad rconpassword.", CVAR_ARCHIVE);
+
+	mod_allowTell = Cvar_Get("mod_allowTell", "1", CVAR_ARCHIVE);
+	mod_allowRadio = Cvar_Get("mod_allowRadio", "1", CVAR_ARCHIVE);
+	mod_allowWeapDrop = Cvar_Get("mod_allowWeapDrop", "1", CVAR_ARCHIVE);
+	mod_allowItemDrop = Cvar_Get("mod_allowItemDrop", "1", CVAR_ARCHIVE);
+	mod_allowFlagDrop = Cvar_Get("mod_allowFlagDrop", "1", CVAR_ARCHIVE);
+	mod_allowSuicide = Cvar_Get("mod_allowSuicide", "1", CVAR_ARCHIVE);
+	mod_allowVote = Cvar_Get("mod_allowVote", "1", CVAR_ARCHIVE);
+	mod_allowTeamSelection = Cvar_Get("mod_allowteamselection", "1", CVAR_ARCHIVE);
+	mod_allowWeapLink = Cvar_Get("mod_allowWeapLink", "1", CVAR_ARCHIVE);
+
+	mod_minKillHealth = Cvar_Get("mod_minKillHealth", "0", CVAR_ARCHIVE);
+	mod_minTeamChangeHealth = Cvar_Get("mod_minTeamChangeHealth", "0", CVAR_ARCHIVE);
+
+	mod_limitHealth = Cvar_Get("mod_limitHealth", "50", CVAR_ARCHIVE);
+	mod_timeoutHealth = Cvar_Get("mod_timeouthealth", "1000", CVAR_ARCHIVE);
+	mod_enableHealth = Cvar_Get("mod_enableHealth", "0", CVAR_ARCHIVE);
+	mod_addAmountOfHealth = Cvar_Get("mod_addAmountOfHealth", "1", CVAR_ARCHIVE);
+	mod_whenMoveHealth = Cvar_Get("mod_whenmovehealth", "1", CVAR_ARCHIVE);
+
+	mod_allowPosSaving = Cvar_Get("mod_allowPosSaving", "0", CVAR_ARCHIVE);
+	mod_persistentPositions = Cvar_Get("mod_persistentPositions", "1", CVAR_ARCHIVE);
+	mod_freeSaving = Cvar_Get("mod_freeSaving", "0", CVAR_ARCHIVE);
+	mod_enableJumpCmds = Cvar_Get("mod_enableJumpCmds", "0", CVAR_ARCHIVE);
+	mod_enableHelpCmd = Cvar_Get("mod_enableHelpCmd", "1", CVAR_ARCHIVE);
+    mod_loadSpeedCmd = Cvar_Get("mod_loadSpeedCmd", "0", CVAR_ARCHIVE);
+	mod_ghostRadius = Cvar_Get("mod_ghostRadius", "80.0", CVAR_ARCHIVE);
+
+	mod_slickSurfaces = Cvar_Get("mod_slickSurfaces", "0", CVAR_ARCHIVE);
+	mod_gameType = Cvar_Get("mod_gameType", "", CVAR_ARCHIVE);
+	mod_ghostPlayers = Cvar_Get("mod_ghostPlayers", "0", CVAR_ARCHIVE);
+	mod_noWeaponRecoil = Cvar_Get("mod_noWeaponRecoil", "0", CVAR_ARCHIVE);
+	mod_noWeaponCycle = Cvar_Get("mod_noWeaponCycle", "0", CVAR_ARCHIVE);
+	mod_specChatGlobal = Cvar_Get("mod_specChatGlobal", "0", CVAR_ARCHIVE);
+	mod_cleanMapPrefixes = Cvar_Get("mod_cleanMapPrefixes", "0", CVAR_ARCHIVE);
+
+	mod_disableScope = Cvar_Get("mod_disableScope", "0", CVAR_ARCHIVE);
+	mod_fastTeamChange = Cvar_Get("mod_fastTeamChange", "0", CVAR_ARCHIVE);
+
+	mod_auth = Cvar_Get("mod_auth", "%s", CVAR_ARCHIVE);
+	mod_defaultauth = Cvar_Get("mod_defaultauth", "", CVAR_ARCHIVE);
+
+    mod_hideServer = Cvar_Get("mod_hideServer", "0", CVAR_ARCHIVE);
+    mod_enableWeaponsCvars = Cvar_Get("mod_enableWeaponsCvars", "1", CVAR_ARCHIVE);
+
+	mod_gunsmod = Cvar_Get ("mod_gunsmod", "0", CVAR_ARCHIVE);
+	mod_infiniteAirjumps = Cvar_Get ("mod_infiniteAirjumps", "0", CVAR_ARCHIVE);
+	mod_customchat = Cvar_Get ("mod_customchat", "0", CVAR_ARCHIVE);
 	mod_punishCampers = Cvar_Get("mod_punishCampers", "0", CVAR_ARCHIVE);
+
+	sv_TurnpikeBlocker = Cvar_Get("sv_TurnpikeBlocker", "0", CVAR_ARCHIVE);
+	sv_ghostOnRoundstart = Cvar_Get("sv_ghostOnRoundstart", "0", CVAR_ARCHIVE);
+	
+	mod_announceNoscopes = Cvar_Get("mod_announceNoscopes", "0", CVAR_ARCHIVE);
+
+	sv_ent_dump = Cvar_Get( "sv_ent_dump", "0", CVAR_ARCHIVE );
+	sv_ent_dump_path = Cvar_Get("sv_ent_dump_path", "", CVAR_ARCHIVE );
+	sv_ent_load = Cvar_Get("sv_ent_load", "1", CVAR_ARCHIVE );
+	sv_ent_load_path = Cvar_Get("sv_ent_load_path", "", CVAR_ARCHIVE );
+
+	mod_jumpSpecAnnouncer = Cvar_Get("mod_jumpSpecAnnouncer", "0", CVAR_ARCHIVE);
+
+	mod_turnpikeTeleporter = Cvar_Get("mod_turnpikeTeleporter", "0", CVAR_ARCHIVE);
+
+	mod_battleroyale = Cvar_Get("mod_battleroyale", "0", CVAR_ARCHIVE);
+
+	mod_1v1arena = Cvar_Get("mod_1v1arena", "0", CVAR_ARCHIVE);
+
+	mod_fastSr8 = Cvar_Get("mod_fastSr8", "0", CVAR_ARCHIVE);
+
+	mod_zombiemod = Cvar_Get("mod_zombiemod", "0", CVAR_ARCHIVE);
 
 	#ifdef USE_AUTH
 	sv_authServerIP = Cvar_Get("sv_authServerIP", "", CVAR_TEMP | CVAR_ROM);
@@ -962,11 +1199,13 @@ to totally exit after returning from this function.
 void SV_FinalMessage( char *message ) {
 	int			i, j;
 	client_t	*cl;
-	
+
 	// send it twice, ignoring rate
 	for ( j = 0 ; j < 2 ; j++ ) {
 		for (i=0, cl = svs.clients ; i < sv_maxclients->integer ; i++, cl++) {
 			if (cl->state >= CS_CONNECTED) {
+				// save the client position to a file
+				SV_SavePositionToFile(cl, sv_mapname->string);
 				// don't send a disconnect to a local client
 				if ( cl->netchan.remoteAddress.type != NA_LOOPBACK ) {
 					SV_SendServerCommand( cl, "print \"%s\n\"\n", message );

@@ -64,11 +64,26 @@ extern int playerStatsOffsets[vMAX][OFFSET_PS_MAX];
 
 
 #define MAX_NETNAME 36
+typedef struct
+{
+	int	connected;
+	usercmd_t	cmd;
+	qboolean unknow1;
+	qboolean unknow2;
+	char		netname[MAX_NETNAME];
+}clientPersistant_t;
 
 typedef struct gentity_s
 {
 	int unknow[171];
 	int health;
 }gentity_t;
+
+typedef struct gclient_s
+{
+	playerState_t ps;
+	clientPersistant_t pers;
+}gclient_t;
+
 
 #endif /* CODE_SERVER_QVMSTRUCTS_H_ */

@@ -62,13 +62,101 @@ cvar_t	*sv_demonotice;				// notice to print to a client being recorded server-s
 cvar_t  *sv_tellprefix;
 cvar_t  *sv_sayprefix;
 cvar_t 	*sv_demofolder;				//@Barbatos - the name of the folder that contains server-side demos
+
+cvar_t  *mod_infiniteStamina;
+cvar_t  *mod_infiniteWallJumps;
+cvar_t  *mod_nofallDamage;
+
+cvar_t  *mod_colourNames;
+
+cvar_t  *mod_playerCount;
+cvar_t  *mod_botsCount;
+cvar_t  *mod_mapName;
+cvar_t  *mod_mapColour;
+cvar_t  *mod_hideCmds;
+cvar_t  *mod_infiniteAmmo;
+cvar_t  *mod_forceGear;
+cvar_t  *mod_checkClientGuid;
+cvar_t  *mod_disconnectMsg;
+cvar_t  *mod_badRconMessage;
+
+cvar_t  *mod_allowTell;
+cvar_t  *mod_allowRadio;
+cvar_t  *mod_allowWeapDrop;
+cvar_t  *mod_allowItemDrop;
+cvar_t  *mod_allowFlagDrop;
+cvar_t  *mod_allowSuicide;
+cvar_t  *mod_allowVote;
+cvar_t  *mod_allowTeamSelection;
+cvar_t  *mod_allowWeapLink;
+
+cvar_t  *mod_minKillHealth;
+cvar_t  *mod_minTeamChangeHealth;
+
+cvar_t  *mod_limitHealth;
+cvar_t  *mod_timeoutHealth;
+cvar_t  *mod_enableHealth;
+cvar_t  *mod_addAmountOfHealth;
+cvar_t  *mod_whenMoveHealth;
+
+cvar_t  *mod_allowPosSaving;
+cvar_t  *mod_persistentPositions;
+cvar_t  *mod_freeSaving;
+cvar_t  *mod_enableJumpCmds;
+cvar_t  *mod_enableHelpCmd;
+cvar_t  *mod_loadSpeedCmd;
+cvar_t  *mod_ghostRadius;
+
+cvar_t  *mod_slickSurfaces;
+cvar_t  *mod_gameType;
+cvar_t  *mod_ghostPlayers;
+cvar_t  *mod_noWeaponRecoil;
+cvar_t  *mod_noWeaponCycle;
+cvar_t  *mod_specChatGlobal;
+cvar_t  *mod_cleanMapPrefixes;
+
+cvar_t  *mod_disableScope;
+cvar_t  *mod_fastTeamChange;
+
+cvar_t  *mod_auth;
+cvar_t  *mod_defaultauth;
+
+cvar_t  *mod_hideServer;
+cvar_t  *mod_enableWeaponsCvars;
+
+cvar_t	*mod_gunsmod;
+cvar_t	*mod_infiniteAirjumps;
+cvar_t	*mod_customchat;
 cvar_t  *mod_punishCampers;
+
+cvar_t	*sv_TurnpikeBlocker;
+cvar_t	*sv_ghostOnRoundstart;
+
+cvar_t	*mod_announceNoscopes;
+
+cvar_t 	*sv_ent_dump;
+cvar_t 	*sv_ent_dump_path;
+cvar_t 	*sv_ent_load;
+cvar_t 	*sv_ent_load_path;
+
+cvar_t	*mod_jumpSpecAnnouncer;
+
+cvar_t	*mod_turnpikeTeleporter;
+
+cvar_t	*mod_battleroyale;
+
+cvar_t	*mod_1v1arena;
+
+cvar_t	*mod_fastSr8;
+cvar_t	*mod_zombiemod;
 
 //@Barbatos
 #ifdef USE_AUTH
 cvar_t	*sv_authServerIP;
 cvar_t  *sv_auth_engine;
 #endif
+
+int ut_weapon_xor;
 
 const char versionString[vMAX][10] = {
 		"unknow",
@@ -80,6 +168,47 @@ const char versionString[vMAX][10] = {
 		"4.3.4"
 };
 
+char teamstring[4][5] =
+{
+		"free",
+		"red",
+		"blue",
+		"spec"
+};
+
+char itemString[UT_ITEM_MAX][10] =
+{
+	[UT_ITEM_REDFLAG] = {"redflag"},
+	[UT_ITEM_BLUEFLAG] = {"blueflag"},
+	[UT_ITEM_VEST] = {"vest"},
+	[UT_ITEM_NVG]  = {"nvg"},
+	[UT_ITEM_SILENCER]  = {"silencer"},
+	[UT_ITEM_LASER]  = {"laser"},
+	[UT_ITEM_MEDKIT] = {"medkit"},
+	[UT_ITEM_HELMET]  = {"helmet"},
+	[UT_ITEM_AMMO]  = {"ammo"},
+	[UT_ITEM_APR]  = {"apr"},
+};
+
+char hitlocationstring[HL_MAX][15] =
+{
+    "unknown",
+    "head",
+    "helmet",
+    "torso",
+    "vest",
+    "arml",
+    "armr",
+    "groin",
+    "butt",
+    "legul",
+    "legur",
+    "legll",
+    "leglr",
+    "footl",
+    "footr"
+};
+
 /*
 =============================================================================
 
@@ -87,6 +216,55 @@ EVENT MESSAGES
 
 =============================================================================
 */
+
+/////////////////////////////////////////////////////////////////////
+// SV_LogPrintf
+/////////////////////////////////////////////////////////////////////
+void QDECL SV_LogPrintf(const char *fmt, ...) {
+
+	va_list       argptr;
+    fileHandle_t  file;
+    fsMode_t      mode;
+    char          *logfile;
+    char          buffer[MAX_STRING_CHARS];
+    int           min, tens, sec;
+    int           logsync;
+
+	// retrieve the logfile name
+	logfile = Cvar_VariableString("g_log");
+	if (!logfile[0]) {
+		return;
+	}
+
+	// retrieve the writing mode
+	logsync = Cvar_VariableIntegerValue("g_logSync");
+	mode = logsync ? FS_APPEND_SYNC : FS_APPEND;
+
+	// opening the log file
+	FS_FOpenFileByMode(logfile, &file, mode);
+	if (!file) {
+		return;
+	}
+
+	// get current level time
+	sec = sv.time / 1000;
+	min = sec / 60;
+	sec -= min * 60;
+	tens = sec / 10;
+	sec -= tens * 10;
+
+	// prepend current level time
+	Com_sprintf(buffer, sizeof(buffer), "%3i:%i%i ", min, tens, sec);
+
+	// get the arguments
+	va_start(argptr, fmt);
+	vsprintf(buffer + 7, fmt, argptr);
+	va_end(argptr);
+
+	// write in the log file
+	FS_Write(buffer, strlen(buffer), file);
+	FS_FCloseFile(file);
+}
 
 /////////////////////////////////////////////////////////////////////
 // SV_GetClientTeam
@@ -97,6 +275,143 @@ int SV_GetClientTeam(int cid) {
     ps = SV_GameClientNum(cid);
     team_t team = *(int*)((void*)ps+gclientOffsets[getVersion()][OFFSET_TEAM]);
     return team;
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_IsClientGhost
+// Tells whether a client has cg_ghost activated
+/////////////////////////////////////////////////////////////////////
+qboolean SV_IsClientGhost(client_t *cl) {
+
+    int ghost;
+
+    // if we are not playing jump mode
+    if (sv_gametype->integer != GT_JUMP) {
+        return qfalse;
+    }
+
+    // get the cg_ghost value from the userinfo string
+    ghost = atoi(Info_ValueForKey(cl->userinfo, "cg_ghost"));
+    return ghost > 0 ? qtrue : qfalse;
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_IsClientInPosition
+// Tells whether a client is in the specified position
+/////////////////////////////////////////////////////////////////////
+qboolean SV_IsClientInPosition(int cid, float x, float y, float z, float xPlus, float yPlus, float zPlus) {
+    playerState_t *ps;
+    ps = SV_GameClientNum(cid);
+    if (ps->origin[0] >= x-xPlus && ps->origin[0] <= x+xPlus &&
+        ps->origin[1] >= y-yPlus && ps->origin[1] <= y+yPlus &&
+        ps->origin[2] >= z-zPlus && ps->origin[2] <= z+zPlus) {
+        return qtrue;
+    }
+    return qfalse;
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_SetClientPosition
+// Teleport a client to the specified position
+/////////////////////////////////////////////////////////////////////
+void SV_SetClientPosition(int cid, float x, float y, float z) {
+    playerState_t *ps;
+    ps = SV_GameClientNum(cid);
+    ps->origin[0] = x;
+    ps->origin[1] = y;
+    ps->origin[2] = z;
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_LoadPositionFromFile
+// Load the client saved position from a file
+/////////////////////////////////////////////////////////////////////
+void SV_LoadPositionFromFile(client_t *cl, char *mapname) {
+
+    fileHandle_t   file;
+    char           buffer[MAX_STRING_CHARS];
+    char           *guid;
+    char           *qpath;
+    int            len;
+
+    // if we are not supposed to save the position on a file
+    if (!mod_allowPosSaving->integer || !mod_persistentPositions->integer) {
+        return;
+    }
+
+    // get the client guid from the userinfo string
+    guid = Info_ValueForKey(cl->userinfo, "cl_guid");
+    if (!guid || !guid[0]) { 
+        return;
+    }
+
+    // open the position file
+    qpath = va("positions/%s/%s.pos", mapname, guid);
+    FS_FOpenFileByMode(qpath, &file, FS_READ);
+
+    // if not valid
+    if (!file) {
+        return;
+    }
+
+    // read the file in the buffer
+    len = FS_Read(buffer, sizeof(buffer), file);
+    if (len > 0) {
+        // copy back saved position
+        sscanf(buffer, "%f,%f,%f,%f,%f,%f", &cl->cm.savedPosition[0],
+                                            &cl->cm.savedPosition[1],
+                                            &cl->cm.savedPosition[2],
+                                            &cl->cm.savedPositionAngle[0],
+                                            &cl->cm.savedPositionAngle[1],
+                                            &cl->cm.savedPositionAngle[2]);
+    }
+
+    // close the file handle
+    FS_FCloseFile(file);  
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_SavePositionToFile
+// Save the client position to a file
+/////////////////////////////////////////////////////////////////////
+void SV_SavePositionToFile(client_t *cl, char *mapname) {
+
+    fileHandle_t   file;
+    char           buffer[MAX_STRING_CHARS];
+    char           *guid;
+    char           *qpath;
+
+    // if we are not supposed to save the position on a file
+    if (!mod_allowPosSaving->integer || !mod_persistentPositions->integer) {
+        return;
+    }
+
+    // get the client guid from the userinfo string
+    guid = Info_ValueForKey(cl->userinfo, "cl_guid");
+    if (!guid || !guid[0] || (!cl->cm.savedPosition[0] && !cl->cm.savedPosition[1] && !cl->cm.savedPosition[2])) { 
+        return;
+    }
+
+    // open the position file
+    qpath = va("positions/%s/%s.pos", mapname, guid);
+    FS_FOpenFileByMode(qpath, &file, FS_WRITE);
+
+    // if not valid
+    if (!file) {
+        return;
+    }
+
+    // compute the text to be stored in the .pos file
+    Com_sprintf(buffer, sizeof(buffer), "%f,%f,%f,%f,%f,%f", cl->cm.savedPosition[0],
+                                                             cl->cm.savedPosition[1],
+                                                             cl->cm.savedPosition[2],
+                                                             cl->cm.savedPositionAngle[0],
+                                                             cl->cm.savedPositionAngle[1],
+                                                             cl->cm.savedPositionAngle[2]);
+    
+    // write the client position and close
+    FS_Write(buffer, strlen(buffer), file);
+    FS_FCloseFile(file);  
 }
 
 /*
@@ -172,6 +487,7 @@ void SV_AddServerCommand( client_t *client, const char *cmd ) {
 //		return;
 //	}
 
+
 	// do not send commands until the gamestate has been sent
 	if( client->state < CS_PRIMED )
 		return;
@@ -194,6 +510,99 @@ void SV_AddServerCommand( client_t *client, const char *cmd ) {
 	Q_strncpyz( client->reliableCommands[ index ], cmd, sizeof( client->reliableCommands[ index ] ) );
 }
 
+void MOD_modifiedAuth(char *auth, char *newauth, int cnum)
+{
+	char ccnum[3];
+	char realauth[MAX_NAME_LENGTH*2];
+	client_t *client;
+
+	client = &svs.clients[cnum];
+	sprintf(ccnum, "%d", cnum);
+
+	//Save auth of the player
+	Q_strncpyz(realauth,auth,MAX_NAME_LENGTH*2);
+	//Get the format for the new auth
+	Q_strncpyz(newauth, mod_auth->string, MAX_NAME_LENGTH*2);
+
+
+	if(Q_stricmp(realauth, "---")==0 && mod_defaultauth->string[0])
+	{
+		//If a default auth is spotted is replaced with the new defaultauth
+		Q_strncpyz(realauth, mod_defaultauth->string,MAX_NAME_LENGTH*2);
+	}
+
+	if(client->cm.authcl[0])
+	{
+		//If a player has a custum auth it is changed
+		Q_strncpyz(realauth, client->cm.authcl, MAX_NAME_LENGTH*2);
+	}
+
+	//Apply format on the new auth
+	str_replace(newauth, "%s",realauth, MAX_NAME_LENGTH*2);
+	str_replace(newauth, "%d",ccnum, MAX_NAME_LENGTH*2);
+
+	//Clean newauth
+	Q_strncpyz(newauth, SV_CleanName(newauth), MAX_NAME_LENGTH*2);
+}
+
+void MOD_parseScore(char *cmd)
+{
+	int j = 0,cnum;
+	byte        csmessage[MAX_MSGLEN] = {0};
+	char newauth[MAX_NAME_LENGTH*2]; //Replace string is generated here
+
+	char* token = strtok(cmd, " ");
+	//Recursive loop into each args
+	while(token) {
+		//This arg should be the cnum of the client
+		if((j-4)%13==0)
+		{
+			cnum = atoi (token);
+		}
+		//This arg should be the auth of a player
+		if((j-16)%13==0 && j!=3)
+		{
+			MOD_modifiedAuth(token, newauth, cnum);
+
+			//Append to the command
+			strcat((char *)csmessage, va("%s ", newauth));
+
+		}else // If its not the auth just save as it is
+		{
+			strcat((char *)csmessage, va("%s ", token));
+		}
+		j++;
+		token=strtok(NULL, " ");
+	}
+	strcpy(cmd, (char *)csmessage);
+}
+void MOD_parseScoresAndDouble(char *cmd)
+{
+	int j = 0, cnum;
+	byte csmessage[MAX_MSGLEN] = {0};
+	char newauth[MAX_NAME_LENGTH*2];
+
+	char* token = strtok(cmd, " ");
+	while(token)
+	{
+		if((j-1)%13==0)
+		{
+			cnum = atoi(token);
+		}
+		if((j-13)%13==0 && j!=0)
+		{
+			MOD_modifiedAuth(token, newauth, cnum);
+
+			strcat((char *)csmessage, va("%s ", newauth));
+		}else
+		{
+			strcat((char *)csmessage, va("%s ", token));
+		}
+		j++;
+		token = strtok(NULL, " ");
+	}
+	strcpy(cmd, (char *)csmessage);
+}
 
 /*
 =================
@@ -209,10 +618,68 @@ void QDECL SV_SendServerCommand(client_t *cl, const char *fmt, ...) {
 	byte		message[MAX_MSGLEN];
 	client_t	*client;
 	int			j;
-	
+
 	va_start (argptr,fmt);
 	Q_vsnprintf ((char *)message, sizeof(message), fmt,argptr);
 	va_end (argptr);
+
+	// Keep track of the clients location for jump use
+	 if ((Q_strncmp((char *)message, "location", 8) == 0) && (sv_gametype->integer == GT_JUMP) && (mod_jumpSpecAnnouncer->integer)) {
+
+		// Update the clients location every second
+		unsigned int time = Com_Milliseconds();
+		if (time - cl->lastLocationTime < 1000) {
+			return;
+		}
+
+		char workString[256];
+		char actualClientLocation[256];
+
+		// Save the clients location in the clientState
+		sprintf(workString, "%s: %s", cl->name, (char *)message);
+		int jumplength = strlen(cl->name) + 11;
+		strcpy(actualClientLocation, workString + jumplength);
+		cl->location = sv.configstrings[atoi(actualClientLocation) + 640];
+
+		// Set the last location time
+		cl->lastLocationTime = time;
+
+		// check if the client has spectators
+		if (cl->spectators[0] != '\0') {
+			char actualspecs[256];
+			Q_strncpyz(actualspecs, cl->spectators, 256);
+			Cmd_ExecuteString(va("location %s \"^3%s ^7[^8%s^7] | ^9Spectators: ^8%s\" 0 1\n", cl->name, cl->name, cl->location, actualspecs));
+			return;
+		} else {
+			// Client has no spectators, send the default string
+			Cmd_ExecuteString(va("location %s \"^3%s ^7[^8%s^7] | ^9Spectators: ^8Nobody is watching you.\" 0 1\n", cl->name, cl->name, cl->location));
+		}
+	 }
+
+	// Location is locked
+	if((Q_strncmp((char *)message, "location", 8) == 0) && cl->cm.locationLocked)
+		return;
+
+	// Grabbing server mutes
+    if (cl != NULL) {
+        if (!strcmp((char *) message, "print \"The admin muted you: you cannot talk\"\n")) {
+            cl->muted = qtrue;
+        }
+        else if (!strcmp((char *) message, "print \"The admin unmuted you\"\n")) {
+            cl->muted = qfalse;
+        }
+        else if (!strcmp((char *) message, "print \"You have been unmuted\"\n")) {
+            cl->muted = qfalse;
+        }
+	}
+
+	// Modify scoreboard for auth change
+    if (Q_strncmp((char *)message, "scores ", 7) == 0) {
+        MOD_parseScore((char *)message);
+    }
+    if (Q_strncmp((char *)message, "scoress ", 8) == 0 || Q_strncmp((char *)message, "scoresd ", 8) == 0) {
+        MOD_parseScoresAndDouble((char *)message);
+    }
 
 	// Fix to http://aluigi.altervista.org/adv/q3msgboom-adv.txt
 	// The actual cause of the bug is probably further downstream
@@ -268,6 +735,10 @@ void SV_MasterHeartbeat( void ) {
 	if ( !com_dedicated || com_dedicated->integer != 2 ) {
 		return;		// only dedicated servers send heartbeats
 	}
+
+	// do not send a heartbeat if hidden server
+	if (mod_hideServer->integer)
+	    return;
 
 	// if not time yet, don't send anything
 	if ( svs.time < svs.nextHeartbeatTime ) {
@@ -374,6 +845,10 @@ void SVC_Status( netadr_t from ) {
 		return;
 	}
 
+	// ignore if hidden server
+	if (mod_hideServer->integer)
+        return;
+
 	strcpy( infostring, Cvar_InfoString( CVAR_SERVERINFO ) );
 
 	// echo back the parameter to status. so master servers can use it as a challenge
@@ -419,13 +894,17 @@ void SVC_Info( netadr_t from ) {
 		return;
 	}
 
+	// ignore if hidden server
+	if (mod_hideServer->integer)
+	    return;
+
 	/*
 	 * Check whether Cmd_Argv(1) has a sane length. This was not done in the original Quake3 version which led
 	 * to the Infostring bug discovered by Luigi Auriemma. See http://aluigi.altervista.org/ for the advisory.
 	 */
 
 	// A maximum challenge length of 128 should be more than plenty.
-	if(strlen(Cmd_Argv(1)) > 128)
+	if (strlen(Cmd_Argv(1)) > 128)
 		return;
 
 	// don't count privateclients
@@ -435,8 +914,13 @@ void SVC_Info( netadr_t from ) {
 		if ( svs.clients[i].state >= CS_CONNECTED ) {
 			count++;
 
-			if (svs.clients[i].netchan.remoteAddress.type == NA_BOT)
-				bots++;
+			if (svs.clients[i].netchan.remoteAddress.type == NA_BOT) {
+				if (mod_botsCount->integer == 1) {
+					bots++;
+				} else {
+					count--;
+				}
+			}
 		}
 	}
 
@@ -448,12 +932,60 @@ void SVC_Info( netadr_t from ) {
 
 	Info_SetValueForKey( infostring, "protocol", va("%i", PROTOCOL_VERSION) );
 	Info_SetValueForKey( infostring, "hostname", sv_hostname->string );
-	Info_SetValueForKey( infostring, "mapname", sv_mapname->string );
+
+	char mapname[MAX_QPATH];
+	Q_strncpyz(mapname, sv_mapname->string, sizeof(mapname));
+
+	if (mod_cleanMapPrefixes->integer) {
+		char *loc;
+		char *prefix42 = "ut42_";
+		char *prefix43 = "ut43_";
+
+		if ((loc = strstr(mapname, prefix42)) != NULL) {
+			strcpy(loc, loc + strlen(prefix42));
+		} else if ((loc = strstr(mapname, prefix43)) != NULL) {
+			strcpy(loc, loc + strlen(prefix43));
+		}
+
+		// Make first letter capital if prefixes were removed
+		if (mapname != sv_mapname->string) {
+			mapname[0] = toupper(mapname[0]);
+		}
+	}
+
+	if(!strcmp(mod_mapName->string, ""))
+		Info_SetValueForKey( infostring, "mapname", va("^%i%s", mod_mapColour->integer, mapname) );
+	else
+		Info_SetValueForKey( infostring, "mapname", va("^%i%s", mod_mapColour->integer, mod_mapName->string) );
+
+	// If playerCount is positive, the number will be added to the real player count
+	// If playerCount is negative a random number between playerCount and 1 will be added
+	if(0 < mod_playerCount->integer) {
+		count += mod_playerCount->integer;
+	}
+	else if(0 > mod_playerCount->integer)
+	{
+		int rand, seed;
+		rand = 0;
+		seed = Com_Milliseconds();
+		while (1 > rand) {
+		    rand = Q_rand(&seed) % mod_playerCount->integer +1;
+	    }
+		count += rand;
+	}
+	if (count > sv_maxclients->integer) {
+		count = sv_maxclients->integer;
+	}
+
 	Info_SetValueForKey( infostring, "clients", va("%i", count) );
 	Info_SetValueForKey( infostring, "bots", va("%i", bots) );
-	Info_SetValueForKey( infostring, "sv_maxclients",
-		va("%i", sv_maxclients->integer - sv_privateClients->integer ) );
-	Info_SetValueForKey( infostring, "gametype", va("%i", sv_gametype->integer ) );
+	Info_SetValueForKey( infostring, "sv_maxclients", va("%i", sv_maxclients->integer - sv_privateClients->integer ) );
+
+	if(!strcmp(mod_gameType->string, ""))
+		Info_SetValueForKey( infostring, "gametype", va("%i", sv_gametype->integer ) );
+	else
+		Info_SetValueForKey( infostring, "gametype", va("%i", mod_gameType->integer ) );
+
 	Info_SetValueForKey( infostring, "pure", va("%i", sv_pure->integer ) );
 	
 	//@Barbatos
@@ -521,11 +1053,7 @@ void SVC_RconRecoveryRemoteCommand( netadr_t from, msg_t *msg ) {
 		valid = qfalse;
 		Com_Printf ("Bad rcon recovery from %s:\n%s\n", NET_AdrToString (from), Cmd_Argv(2) );
 	} else {
-		// MaJ - If the rconpassword is good, allow it much sooner than a bad one.
-		if ( (unsigned)( time - lasttime ) < 180u )
-			return;
-
-		
+		// Same here.. don't limit good rcon commands
 		valid = qtrue;
 		Com_Printf ("Rcon recovery from %s:\n%s\n", NET_AdrToString (from), Cmd_Argv(2) );
 	}
@@ -586,14 +1114,8 @@ void SVC_RemoteCommand( netadr_t from, msg_t *msg ) {
 		valid = qfalse;
 		Com_Printf ("Bad rcon from %s:\n%s\n", NET_AdrToString (from), Cmd_Argv(2) );
 	} else {
-	
-		// let's the sv_rconAllowedSpamIP do spam rcon
-		if ( ( !strlen( sv_rconAllowedSpamIP->string ) || !NET_CompareBaseAdr( from , allowedSpamIPAdress ) ) && !NET_IsLocalAddress(from) ){
-			// MaJ - If the rconpassword is good, allow it much sooner than a bad one.
-			if ( (unsigned)( time - lasttime ) < 180u )
-				return;
-		}
 		
+		// Why limit a good rcon command? Just let bots run at max speed.. ffs
 		valid = qtrue;
 		Com_Printf ("Rcon from %s:\n%s\n", NET_AdrToString (from), Cmd_Argv(2) );
 	}
@@ -606,7 +1128,7 @@ void SVC_RemoteCommand( netadr_t from, msg_t *msg ) {
 	if ( !strlen( sv_rconPassword->string ) ) {
 		Com_Printf ("No rconpassword set on the server.\n");
 	} else if ( !valid ) {
-		Com_Printf ("Bad rconpassword.\n");
+		Com_Printf ("%s\n", mod_badRconMessage->string);
 	} else {
 		remaining[0] = 0;
 		
@@ -865,10 +1387,10 @@ SV_CalcPings
 Updates the cl->ping variables
 ===================
 */
-void SV_CalcPings( void ) {
+static void SV_CalcPings( void ) {
 	int			i, j;
 	client_t	*cl;
-	int			total, count;
+    int			total, count;
 	int			delta;
 	playerState_t	*ps;
 
@@ -889,21 +1411,49 @@ void SV_CalcPings( void ) {
 
 		total = 0;
 		count = 0;
-		for ( j = 0 ; j < PACKET_BACKUP ; j++ ) {
-			if ( cl->frames[j].messageAcked <= 0 ) {
-				continue;
-			}
-			delta = cl->frames[j].messageAcked - cl->frames[j].messageSent;
-			count++;
-			total += delta;
-		}
+
+        // Treat unacknowledged frames when there is a later acknowledged frame as
+        // acknowledged at the same time as the later frame, instead of ignoring.
+        // This should more accurately account for ping increases in certain conditions such as packet loss.
+        int current_frame = cl->netchan.outgoingSequence - 1;
+        int current_ack_time = -1;
+        for ( j = 0 ; j < PACKET_BACKUP && current_frame > 0 ; j++ ) {
+            // Read frames backwards from latest to earliest
+            clientSnapshot_t *frame = &cl->frames[(current_frame--) & PACKET_MASK];
+
+            // Use the earliest valid ack time as current
+            if(frame->messageAcked != -1 && (current_ack_time == -1 || frame->messageAcked < current_ack_time)) {
+                current_ack_time = frame->messageAcked;
+            }
+
+            if(current_ack_time != -1) {
+                delta = current_ack_time - frame->messageSent;
+                count++;
+                total += delta;
+            }
+        }
+
+#if 0
+        for ( j = 0 ; j < PACKET_BACKUP ; j++ ) {
+            if ( cl->frames[j].messageAcked == -1 ) {  // <= 0
+                continue;
+            }
+            delta = cl->frames[j].messageAcked - cl->frames[j].messageSent;
+            count++;
+            total += delta;
+        }
+#endif
+
 		if (!count) {
 			cl->ping = 999;
 		} else {
-			cl->ping = total/count;
+            cl->ping = total/count;
 			if ( cl->ping > 999 ) {
 				cl->ping = 999;
 			}
+            if ( cl->ping < 1 ) {
+                cl->ping = 1; // minimum ping for humans
+            }
 		}
 
 		// let the game dll know about the ping

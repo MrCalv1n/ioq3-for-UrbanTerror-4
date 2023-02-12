@@ -27,14 +27,14 @@ ifeq ($(COMPILE_PLATFORM),mingw32)
   endif
 endif
 
-BUILD_CLIENT     =1
+BUILD_CLIENT     =0
 BUILD_CLIENT_SMP =0
 BUILD_SERVER     =1
 BUILD_GAME_SO    =0
 BUILD_GAME_QVM   =0
 OPTIMIZE         =1
 USE_SDL          =1
-USE_SDL_SOUND    =0
+
 USE_OPENAL       =0
 USE_CURL         =1
 USE_CODEC_VORBIS =0
@@ -220,7 +220,7 @@ ifeq ($(PLATFORM),linux)
   endif
   endif
 
-  BASE_CFLAGS = -Wall -fno-strict-aliasing -Wimplicit -Wstrict-prototypes -pipe
+  BASE_CFLAGS = -Wno-unused-result -Wall -fno-strict-aliasing -Wimplicit -Wstrict-prototypes -pipe
 
   ifeq ($(USE_OPENAL),1)
     BASE_CFLAGS += -DUSE_OPENAL=1
@@ -530,10 +530,6 @@ ifeq ($(PLATFORM),freebsd)
      SDL_LIBS=$(shell pkg-config --libs sdl)
      VORBIS_CFLAGS=$(shell pkg-config --silence-errors --cflags vorbis vorbisfile)
      VORBIS_LIBS=$(shell pkg-config --silence-errors --libs vorbis vorbisfile)
-   endif
-
-   ifeq ($(USE_SDL_SOUND), 1)
-     SDL_CFLAGS += -DUSE_SDL_SOUND
    endif
 
    USE_SDL = 1
@@ -894,6 +890,9 @@ endif
 ifeq ($(USE_CCACHE),1)
   CC := ccache $(CC)
 endif
+
+GIT_VERSION := $(shell git describe --long)
+BASE_CFLAGS += -DGIT_VERSION=\\\"$(GIT_VERSION)\\\"
 
 #Barbatos
 ifeq ($(USE_AUTH),1)
@@ -1336,6 +1335,7 @@ Q3DOBJ = \
   $(B)/ded/sv_net_chan.o \
   $(B)/ded/sv_snapshot.o \
   $(B)/ded/sv_world.o \
+  $(B)/ded/sv_weapon.o \
   $(B)/ded/qvm_offsets.o \
   \
   $(B)/ded/cm_load.o \

@@ -24,7 +24,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 /*
 ===============================================================================
-
 OPERATOR CONSOLE ONLY COMMANDS
 
 These commands can only be entered from stdin or by a remote operator datagram
@@ -72,12 +71,18 @@ client_t *SV_BetterGetPlayerByHandle(const char *handle) {
             continue;
         }
 
-        if (!Q_stricmp(cl->name, handle)) {
+        if (!Q_stricmp(cl->name, handle) || !Q_stricmp(cl->colourName, handle)) {
             return cl;
         }
 
         Q_strncpyz(cleanName, cl->name, sizeof(cleanName));
-        Q_CleanStr(cleanName );
+        Q_CleanStr(cleanName);
+        if (!Q_stricmp(cleanName, handle)) {
+            return cl;
+        }
+
+        Q_strncpyz(cleanName, cl->colourName, sizeof(cleanName));
+        Q_CleanStr(cleanName);
         if (!Q_stricmp(cleanName, handle)) {
             return cl;
         }
@@ -148,14 +153,21 @@ static client_t *SV_GetPlayerByHandle(void) {
                 continue;
             }
 
+            // check for exact match
+            if (!Q_stricmp(cl->name, s) || !Q_stricmp(cl->colourName, s)) {
+                return cl;
+            }
+
             strcpy(name, cl->name);
             Q_CleanStr(name);
+            if (!Q_stricmp(name, s)) {
+                return cl;
+            }
 
-            // check for exact match
-            if (!Q_stricmp(name,s)) {
-                matches[0] = &svs.clients[i];
-                count = 1;
-                break;
+            strcpy(name, cl->colourName);
+            Q_CleanStr(name);
+            if (!Q_stricmp(name, s)) {
+                return cl;
             }
 
             // check for substring match
@@ -167,20 +179,19 @@ static client_t *SV_GetPlayerByHandle(void) {
         }
 
         if (count == 0) {
-
             // no match found for the given input string
-            Com_Printf("No client found matching %s\n", s);
+            Com_Printf("No client found matching: %s\n", s);
             return NULL;
 
         } else if (count > 1) {
 
             // multiple matches found for the given string
-            Com_Printf("Multiple clients found matching %s:\n", s);
+            Com_Printf("Multiple clients found matching '%s':\n", s);
 
             for (i = 0; i < count; i++) {
                 cl = matches[i];
                 strcpy(name, cl->name);
-                Com_Printf(" %2d: [%s]\n", (int)(cl - svs.clients), name);
+                Com_Printf(" %2d: [%s^7]\n", (int)(cl - svs.clients), name);
             }
 
             return NULL;
@@ -188,7 +199,6 @@ static client_t *SV_GetPlayerByHandle(void) {
 
         // found just 1 match
         return matches[0];
-
     }
 
 }
@@ -270,7 +280,7 @@ static int SV_Argc_to_idnum( int arg_num ) {
 	}
 
 	search = Cmd_Argv( arg_num );
-
+	
 	if(strlen( search ) < 3 )
 	{
 		for (i = 0; search[i]; i++) {
@@ -314,29 +324,29 @@ static int SV_Argc_to_idnum( int arg_num ) {
 									f++;
 								}
 							}
-							if (f==slen) {
-								count++;
-								idnum = i;
-								break;
+							if (f==slen) { 
+								count++; 
+								idnum = i; 
+								break; 
 							}
 						}
 					}
 				}
 			}
 		}
-		if( count == 1 ) {
+		if( count == 1 ) { 
 			return idnum;
 		}
-		if( count > 0 ) {
+		if( count > 0 ) { 
 			Com_Printf( "Too many players found for \"%s\".\n", search );
 			return -1;
 		}
-		if( count == 0 ) {
+		if( count == 0 ) { 
 			Com_Printf( "No player found for \"%s\".\n", search );
 			return -1;
 		}
 	}
-
+	
 	return -1;
 }*/
 #endif
@@ -370,7 +380,7 @@ static int QDECL SV_SortMaps(const void *a, const void *b) {
 // Description : Retrieve a full map name given a substring of it
 // Author      : Fenix, p5yc0runn3r
 /////////////////////////////////////////////////////////////////////
-static char *SV_GetMapSoundingLike(const char *s)
+static char *SV_GetMapSoundingLike(const char *s) 
 {
     int  i, mapcount;
     int  len = 0, count = 0;
@@ -381,7 +391,7 @@ static char *SV_GetMapSoundingLike(const char *s)
     // [BUGFIX]: instead of iterating through all the maps matching both full and
     // partial name, search just for the exact map name and return it if the match is found
     Com_sprintf(maplist, sizeof(maplist), "maps/%s.bsp", s);
-    if (FS_ReadFile(maplist, NULL) > 0)
+    if (FS_ReadFile(maplist, NULL) > 0) 
     {
         Com_sprintf(maplist, sizeof(maplist), "%s", s);
         return maplist; // @p5yc0runn3r: Return static string
@@ -389,19 +399,19 @@ static char *SV_GetMapSoundingLike(const char *s)
 
     // We didn't found an exact name match. Keep iterating through all the
     // available maps matching partial substrings
-    if (!(mapcount = FS_GetFileList("maps", ".bsp", maplist, sizeof(maplist))))
+    if (!(mapcount = FS_GetFileList("maps", ".bsp", maplist, sizeof(maplist)))) 
     {
         Com_Printf("Unable to retrieve map list\n");
         return NULL;
     }
 
-    for (searchmap = maplist, i = 0; i < mapcount && count < MAX_MAPLIST_SIZE; i++, searchmap += len + 1)
+    for (searchmap = maplist, i = 0; i < mapcount && count < MAX_MAPLIST_SIZE; i++, searchmap += len + 1) 
     {
         len = strlen(searchmap);
         SV_StripExtension(searchmap, searchmap);
 
         // Check for substring match
-        if (Q_strisub(searchmap, s))
+        if (Q_strisub(searchmap, s)) 
         {
             matches[count] = searchmap;
             count++;
@@ -411,7 +421,7 @@ static char *SV_GetMapSoundingLike(const char *s)
     // One match = one map, found match.
     if (count == 1) return matches[0]; // @p5yc0runn3r: matches points to static string, safe to return.
 
-    if (count > 1)
+    if (count > 1) 
     {
         // Multiple matches found for the given map name
         Com_Printf("Multiple maps found matching '%s':\n", s);
@@ -419,13 +429,13 @@ static char *SV_GetMapSoundingLike(const char *s)
         // Sorting the short map list alphabetically
         qsort(matches, count, sizeof(char *), SV_SortMaps);
 
-        for (i = 0; i < count; i++)
+        for (i = 0; i < count; i++) 
         {
             // Printing a short map list so the user can retry with a more specific name
             Com_Printf(" %2d: [%s]\n", i + 1, matches[i]);
         }
 
-        if (count >= MAX_MAPLIST_SIZE)
+        if (count >= MAX_MAPLIST_SIZE) 
         {
             // Tell the user that there are actually more
             // maps matching the given substring, although
@@ -535,7 +545,7 @@ static void SV_MapRestart_f( void ) {
 
 	// make sure server is running
 	if ( !com_sv_running->integer ) {
-		Com_Printf( "Server is not running.\n" );
+		Com_Printf( "Server is not running\n" );
 		return;
 	}
 
@@ -572,7 +582,7 @@ static void SV_MapRestart_f( void ) {
 	// map_restart has happened
 	svs.snapFlagServerBit ^= SNAPFLAG_SERVERCOUNT;
 
-	// generate a new serverid
+	// generate a new serverid	
 	// TTimo - don't update restartedserverId there, otherwise we won't deal correctly with multiple map_restart
 	sv.serverId = com_frameTime;
 	Cvar_Set( "sv_serverid", va("%i", sv.serverId ) );
@@ -634,6 +644,10 @@ static void SV_MapRestart_f( void ) {
 			continue;
 		}
 
+        // set stamina and walljumps back to default
+        client->cm.infiniteStamina = 0;
+        client->cm.infiniteWallJumps = 0;
+
 		if(client->state == CS_ACTIVE) {
 			SV_ClientEnterWorld(client, &client->lastUsercmd);
 		}
@@ -643,7 +657,7 @@ static void SV_MapRestart_f( void ) {
 		 	// which is wrong obviously.
 		 	SV_ClientEnterWorld(client, NULL);
 		}
-	}
+	}	
 
 	// run another frame to allow things to look at all the players
 	VM_Call (gvm, GAME_RUN_FRAME, sv.time);
@@ -664,7 +678,7 @@ static void SV_Kick_f(void) {
 
     int         i;
     client_t    *cl;
-    char        *reason = "was kicked";
+    char        *reason = "was ^1kicked^7";
 
     // make sure server is running
     if (!com_sv_running->integer ) {
@@ -679,7 +693,7 @@ static void SV_Kick_f(void) {
 
     if (Cmd_Argc() == 3) {
         // If the reason was specified attach it to the disconnect message
-        reason = va("was kicked: %s", Cmd_Argv(2));
+        reason = va("was ^1kicked^7: %s", Cmd_Argv(2));
     }
 
 
@@ -790,7 +804,7 @@ static void SV_Ban_f(void) {
                            "banUser %i.%i.%i.%i", cl->netchan.remoteAddress.ip[0], cl->netchan.remoteAddress.ip[1],
                            cl->netchan.remoteAddress.ip[2], cl->netchan.remoteAddress.ip[3]);
 
-        Com_Printf("%s was banned from coming back\n", cl->name);
+        Com_Printf("%s ^7was banned from coming back\n", cl->name);
 
     }
 }
@@ -848,7 +862,7 @@ static void SV_BanNum_f( void ) {
                            "banUser %i.%i.%i.%i", cl->netchan.remoteAddress.ip[0], cl->netchan.remoteAddress.ip[1],
                            cl->netchan.remoteAddress.ip[2], cl->netchan.remoteAddress.ip[3] );
 
-        Com_Printf("%s was banned from coming back\n", cl->name);
+        Com_Printf("%s ^7was banned from coming back\n", cl->name);
 
     }
 }
@@ -885,7 +899,7 @@ static void SV_KickNum_f(void) {
         return;
     }
 
-    SV_DropClient(cl, "was kicked");
+    SV_DropClient(cl, "was ^1kicked^7");
     cl->lastPacketTime = svs.time;    // in case there is a funny zombie
 
 }
@@ -970,7 +984,7 @@ static void SV_ConSay_f(void) {
 
     // make sure server is running
     if (!com_sv_running->integer) {
-        Com_Printf("Server is not running.\n");
+        Com_Printf("Server is not running\n");
         return;
     }
 
@@ -987,10 +1001,8 @@ static void SV_ConSay_f(void) {
     }
 
     strcat(text, p);
-    SV_SendServerCommand(NULL, "chat \"%s\n\"", text);
-
+    SV_SendServerCommand(NULL, "chat \"%s\"", text);
 }
-
 
 /*
 ==================
@@ -1010,7 +1022,7 @@ static void SV_ConTell_f(void) {
     }
 
     if (Cmd_Argc() < 3) {
-        Com_Printf("Usage: tell <client> <text>\n");
+        Com_Printf("Usage: tell <client> <message>\n");
         return;
     }
 
@@ -1029,8 +1041,7 @@ static void SV_ConTell_f(void) {
     }
 
     strcat(text, p);
-    SV_SendServerCommand(cl, "chat \"%s\n\"", text);
-
+    SV_SendServerCommand(cl, "chat \"%s\"", text);
 }
 
 
@@ -1378,17 +1389,17 @@ static void SV_StartRecordOne(client_t *client, char *filename) {
     Com_DPrintf("SV_StartRecordOne\n");
 
     if (client->demo_recording) {
-        Com_Printf("startserverdemo: %s is already being recorded\n", client->name);
+        Com_Printf("startserverdemo: %s ^7is already being recorded\n", client->name);
         return;
     }
 
     if (client->state != CS_ACTIVE) {
-        Com_Printf("startserverdemo: %s is not active\n", client->name);
+        Com_Printf("startserverdemo: %s ^7is not active\n", client->name);
         return;
     }
 
     if (client->netchan.remoteAddress.type == NA_BOT) {
-        Com_Printf("startserverdemo: %s is a bot\n", client->name);
+        Com_Printf("startserverdemo: %s ^7is a bot\n", client->name);
         return;
     }
 
@@ -1399,7 +1410,7 @@ static void SV_StartRecordOne(client_t *client, char *filename) {
         SV_SendServerCommand(client, "print \"%s\"\n", sv_demonotice->string);
     }
 
-    Com_Printf("startserverdemo: recording %s to %s\n", client->name, path);
+    Com_Printf("startserverdemo: recording %s ^7to %s\n", client->name, path);
 }
 
 static void SV_StartRecordAll(void) {
@@ -1425,17 +1436,17 @@ static void SV_StopRecordOne(client_t *client) {
     Com_DPrintf("SV_StopRecordOne\n");
 
     if (!client->demo_recording) {
-        Com_Printf("stopserverdemo: %s is not being recorded\n", client->name);
+        Com_Printf("stopserverdemo: %s ^7is not being recorded\n", client->name);
         return;
     }
 
     if (client->state != CS_ACTIVE) { // disconnects are handled elsewhere
-        Com_Printf("stopserverdemo: %s is not active\n", client->name);
+        Com_Printf("stopserverdemo: %s ^7is not active\n", client->name);
         return;
     }
 
     if (client->netchan.remoteAddress.type == NA_BOT) {
-        Com_Printf("stopserverdemo: %s is a bot\n", client->name);
+        Com_Printf("stopserverdemo: %s ^7is a bot\n", client->name);
         return;
     }
 
@@ -1572,6 +1583,910 @@ static void SV_CompleteMapName( char *args, int argNum ) {
 	}
 }*/
 
+
+
+/*
+===============================================================================
+                            TitanMod Commands
+===============================================================================
+*/
+
+/////////////////////////////////////////////////////////////////////
+// SV_PlaySoundFile_f
+/////////////////////////////////////////////////////////////////////
+static void SV_PlaySoundFile_f (void)
+{
+	client_t *cl;
+
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running\n");
+		return;
+	}
+
+	if(Cmd_Argc() != 3)
+	{
+		Com_Printf("Usage: playsoundfile <player> <file>\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(!cl)
+	{
+		return;
+	}
+
+	MOD_PlaySoundFile (cl, Cmd_Argv(2));
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_PlaySound_f
+/////////////////////////////////////////////////////////////////////
+static void SV_PlaySound_f (void)
+{
+	client_t *cl;
+	int index;
+
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running\n");
+		return;
+	}
+
+	if(Cmd_Argc() != 3)
+	{
+		Com_Printf("Usage: playsound <player> <index>\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(!cl)
+	{
+		return;
+	}
+	if(!sscanf(Cmd_Argv(2), "%d", &index) && (index > 0 && index <256))
+	{
+		Com_Printf("Incorrect value!\n");
+	}
+
+	MOD_SetExternalEvent(cl, EV_GLOBAL_SOUND, index);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_ResquestDownload_f
+/////////////////////////////////////////////////////////////////////
+static void SV_ResquestDownload_f (void)
+{
+	client_t *cl;
+
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running\n");
+		return;
+	}
+
+	if(Cmd_Argc() != 3)
+	{
+		Com_Printf("Usage: resquestdownload <player> <file>\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(!cl)
+	{
+		return;
+	}
+
+	 MOD_ResquestPk3DownloadByClientGameState (cl, Cmd_Argv(2));
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_SendClientCommand_f
+/////////////////////////////////////////////////////////////////////
+static void SV_SendClientCommand_f(void) {
+
+    char      *cmd;
+    client_t  *cl;
+
+    // make sure server is running
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running\n");
+        return;
+    }
+
+    // check for correct parameters
+    if (Cmd_Argc() < 3 || !strlen(Cmd_Argv(2))) {
+        Com_Printf("Usage: sendclientcommand or scc <player/all> <command>\n");
+        return;
+    }
+
+    // get the command
+    cmd = Cmd_ArgsFromRaw(2);
+
+    if (!Q_stricmp(Cmd_Argv(1), "all")) {
+        // send the command to everyone
+        SV_SendServerCommand(NULL, "%s", cmd);
+
+    } else {
+
+        // search the client
+        cl = SV_GetPlayerByHandle();
+        if (!cl) {
+            return;
+        }
+
+        // send the command to the client
+        SV_SendServerCommand(cl, "%s", cmd); 
+    }
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_ForceCvar_f_helper
+// Set a CVAR for a user (helper)
+/////////////////////////////////////////////////////////////////////
+static void SV_ForceCvar_f_helper(client_t *cl) {
+
+    // if the client is not connected
+    if (cl->state < CS_CONNECTED) {
+        return;
+    }
+
+    Info_SetValueForKey(cl->userinfo, Cmd_Argv(2), Cmd_Argv(3));
+
+    SV_UserinfoChanged(cl);
+
+    // call prog code to allow overrides
+    VM_Call(gvm, GAME_CLIENT_USERINFO_CHANGED, cl - svs.clients);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_ForceCvar_f
+// Set a CVAR for a user
+/////////////////////////////////////////////////////////////////////
+static void SV_ForceCvar_f(void) {
+
+    int       i;
+    client_t  *cl;
+
+    // make sure server is running
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running\n");
+        return;
+    }
+
+    if (Cmd_Argc() != 4 || strlen(Cmd_Argv(2)) == 0) {
+        Com_Printf("Usage: forcecvar <player/all/allbots> <cvar> <value>\n");
+        return;
+    }
+
+    if (!Q_stricmp(Cmd_Argv(1), "all")) {
+
+        for (i = 0, cl = svs.clients; i < sv_maxclients->integer; i++, cl++) {
+
+            // if not connected
+            if (!cl->state) {
+                continue;
+            }
+
+            // call internal helper
+            SV_ForceCvar_f_helper(cl);
+        }
+
+    } else if (!Q_stricmp(Cmd_Argv(1), "allbots")) {
+
+        for (i = 0, cl = svs.clients; i < sv_maxclients->integer; i++, cl++) {
+
+            // if not connected
+            if (!cl->state) {
+                continue;
+            }
+
+            // if the player is not a bot
+            if (cl->netchan.remoteAddress.type != NA_BOT) {
+                continue;
+            }
+
+            // call internal helper
+            SV_ForceCvar_f_helper(cl);
+        }
+
+    } else {
+
+        // search the client
+        cl = SV_GetPlayerByHandle();
+        if (!cl) {
+            return;
+        }
+
+        // call internal helper
+        SV_ForceCvar_f_helper(cl);
+    }
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_ChangeAuth_f
+// Change auth of the scoreboard
+/////////////////////////////////////////////////////////////////////
+void SV_ChangeAuth_f (void)
+{
+	client_t *cl;
+
+	if(!com_sv_running->integer)
+		return;
+
+	if(Cmd_Argc() != 3)
+	{
+		Com_Printf("Usage: changeauth <player> <newauth>\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(!cl)
+		return;
+
+	Q_strncpyz(cl->cm.authcl, Cmd_Argv(2), MAX_NAME_LENGTH);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Setuser_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Setuser_f (void)
+{
+	client_t *cl;
+
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running\n");
+		return;
+	}
+	if(Cmd_Argc() != 2)
+	{
+		Com_Printf("Usage: setuser <player> \n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(!cl)
+		return;
+    cl->isuser = qtrue;
+    Com_Printf("^7Player ^5%s ^7set as user.\n", cl->name);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Setadmin_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Setadmin_f (void)
+{
+	client_t *cl;
+
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running\n");
+		return;
+	}
+	if(Cmd_Argc() != 2)
+	{
+		Com_Printf("Usage: setadmin <player> \n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(!cl)
+		return;
+    cl->isadmin = qtrue;
+    Com_Printf("^7Player ^5%s ^7set as admin.\n", cl->name);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Setbot_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Setbot_f (void)
+{
+	client_t *cl;
+
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running\n");
+		return;
+	}
+	if(Cmd_Argc() != 2)
+	{
+		Com_Printf("Usage: setbot <bot> \n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(!cl)
+		return;
+    cl->isbot = qtrue;
+    Com_Printf("^7Player ^5%s ^7set as bot.\n", cl->name);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Setowner_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Setowner_f (void)
+{
+	client_t *cl;
+
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running\n");
+		return;
+	}
+	if(Cmd_Argc() != 2)
+	{
+		Com_Printf("Usage: setowner <player> \n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(!cl)
+		return;
+    cl->isowner = qtrue;
+    Com_Printf("^7Player ^5%s ^7set as owner.\n", cl->name);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Setauthed_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Setauthed_f (void)
+{
+	client_t *cl;
+
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running\n");
+		return;
+	}
+	if(Cmd_Argc() != 2)
+	{
+		Com_Printf("Usage: setauthed <player> \n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(!cl)
+		return;
+    cl->isauthed = qtrue;
+    Com_Printf("^7Player ^5%s ^7set as authed.\n", cl->name);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Setcolour_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Setcolour_f (void)
+{
+	client_t *cl;
+
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running\n");
+		return;
+	}
+	if(Cmd_Argc() != 3)
+	{
+		Com_Printf("Usage: setcolour <player> <colour>\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(!cl)
+		return;
+    cl->chatcolour = atoi(Cmd_Argv(2));
+    Com_Printf("^7Players colour set to ^5%s.\n", Cmd_Argv(2));
+}
+
+char *str_replace66(char *orig, char *rep, char *with) {
+    char *result; // the return string
+    char *ins;    // the next insert point
+    char *tmp;    // varies
+    int len_rep;  // length of rep (the string to remove)
+    int len_with; // length of with (the string to replace rep with)
+    int len_front; // distance between rep and end of last rep
+    int count;    // number of replacements
+
+    // sanity checks and initialization
+    if (!orig || !rep)
+        return NULL;
+    len_rep = strlen(rep);
+    if (len_rep == 0)
+        return NULL; // empty rep causes infinite loop during count
+    if (!with)
+        with = "";
+    len_with = strlen(with);
+
+    // count the number of replacements needed
+    ins = orig;
+    for (count = 0; tmp = strstr(ins, rep); ++count) {
+        ins = tmp + len_rep;
+    }
+
+    tmp = result = malloc(strlen(orig) + (len_with - len_rep) * count + 1);
+
+    if (!result)
+        return NULL;
+
+    // first time through the loop, all the variable are set correctly
+    // from here on,
+    //    tmp points to the end of the result string
+    //    ins points to the next occurrence of rep in orig
+    //    orig points to the remainder of orig after "end of rep"
+    while (count--) {
+        ins = strstr(orig, rep);
+        len_front = ins - orig;
+        tmp = strncpy(tmp, orig, len_front) + len_front;
+        tmp = strcpy(tmp, with) + len_with;
+        orig += len_front + len_rep; // move to next "end of rep"
+    }
+    strcpy(tmp, orig);
+    return result;
+}
+
+
+/////////////////////////////////////////////////////////////////////
+// SV_BigText_f
+//
+// This will override the default bigtext function
+// multilines should be declared with /n instead of \n
+/////////////////////////////////////////////////////////////////////
+static void SV_BigText_f(void) {
+
+	if (!com_sv_running->integer) {
+		Com_Printf("Server is not running\n");
+		return;
+	}
+
+	if (Cmd_Argc() < 2) {
+		Com_Printf("Usage: bigtext <text>\n");
+        Com_Printf("Note: '/n' will count as a newline for multiline bigtext.\n");
+		return;
+	}
+
+    char* newLine = "\n";
+    char* toReplace = "/n";
+    char* bigText = str_replace66(Cmd_Argv(1), toReplace, newLine);
+
+    SV_SendServerCommand(NULL, "cp \"%s\"", bigText);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_ToggleParticles_f
+/////////////////////////////////////////////////////////////////////
+
+static void SV_ToggleParticles_f (void)
+{
+    client_t *cl;
+
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running\n");
+        return;
+    }
+
+    if (Cmd_Argc() < 2) {
+        Com_Printf("Usage: particlefx <player>\n");
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        Com_Printf("Unable to get client\n");
+        return;
+    }
+
+    if (cl->particlefx) {
+        cl->particlefx = qfalse;
+        SV_SendServerCommand(cl, "cchat \"\" \"^5Particles ^3have been ^7[^1DISABLED^7]\"");
+    } else {
+        cl->particlefx = qtrue;
+        SV_SendServerCommand(cl, "cchat \"\" \"^5Particles ^3have been ^7[^2ENABLED^7]\"");
+    }
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Attach_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Attach_f(void) {
+    Com_Printf("Debug 1");
+    client_t      *cl, *cl2;
+
+    // make sure server is running
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running.\n");
+        return;
+    }
+
+    // check for correct number of arguments
+    if (Cmd_Argc() != 3) {
+        Com_Printf("Usage: attach <player1> <player2>\n");
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        return;
+    }
+
+    Cmd_TokenizeString(Cmd_Args());
+
+    cl2 = SV_GetPlayerByHandle();
+    // return if no client2 or if both players are the same
+    if (!cl2 || cl2 == cl) {
+        return;
+    }
+
+    if (cl->isattached || cl2->hasattached) {
+        return;
+    }
+    
+    unsigned int time = Com_Milliseconds();
+    int cid = cl2 - svs.clients;
+    cl2->hasattached = qtrue;
+    cl->attachedto = cid;
+    cl->isattached = qtrue;
+    cl->stopattach = time + 30000;
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Disarm_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Disarm_f(void) {
+
+    client_t *cl;
+
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running\n");
+        return;
+    }
+
+    if (Cmd_Argc() < 2) {
+        Com_Printf("Usage: disarm <player>\n");
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        return;
+    }
+    char* weapons_all[23] = { "hk69", "lr", "spas12", "m4", "psg1", "mp5k", "ak103", "negev", "g36", "sr8", "ump45", "mac11", "p90", "frf1", "benelli", "fstod", "beretta", "deagle", "colt", "glock", "magnum", "knife", "he" };
+    for (int i = 0; i < sizeof(weapons_all) / sizeof(const char*); i++) {
+	    Cmd_ExecuteString(va("rw %s %s", cl->name, weapons_all[i]));
+    }
+
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_GetWeapons_f
+/////////////////////////////////////////////////////////////////////
+static void SV_GetWeapons_f(void) {
+
+    client_t *cl;
+    playerState_t *ps;
+
+    char* returnstring = "";
+
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running\n");
+        return;
+    }
+
+    if (Cmd_Argc() < 2) {
+        Com_Printf("Usage: getweapons <player>\n");
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        return;
+    }
+
+    int counter = 0;
+
+    ps = SV_GameClientNum(cl - svs.clients);
+    char* weapons_all[22] = { "hk69", "lr", "spas12", "m4", "psg1", "mp5k", "ak103", "negev", "g36", "sr8", "ump45", "mac11", "p90", "frf1", "benelli", "fstod", "beretta", "deagle", "colt", "glock", "magnum", "knife" };
+    for (int i = 0; i < sizeof(weapons_all) / sizeof(const char*); i++) {
+        if (SV_FirstMatchFor(ps, SV_Char2Weapon(weapons_all[i])) != -1) {
+            if (counter == 0) {
+                returnstring = weapons_all[i];
+            } else {
+                returnstring = va("%s,%s", returnstring, weapons_all[i]);
+            }
+            counter++;
+        }
+    }
+    Com_Printf("%s", returnstring);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Silentname_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Silentname_f (void)
+{
+    client_t *cl;
+
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running\n");
+        SV_LogPrintf("Silentname: Server is not running\n");
+        return;
+    }
+
+    if (Cmd_Argc() < 3) {
+        Com_Printf("Usage: silentname <player> <newname>\n");
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        Com_Printf("Unable to get client\n");
+        SV_LogPrintf("Silentname: Unable to get client\n");
+        return;
+    }
+
+    // clear the current customname
+    memset(cl->lastcustomname,0,sizeof(cl->lastcustomname));    
+    Q_strncpyz(cl->lastcustomname, Cmd_Argv(2), 128);
+    cl->customname = qtrue;
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Getplayerteam_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Getplayerteam_f (void)
+{
+    client_t *cl;
+    playerState_t *ps;
+
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running\n");
+        return;
+    }
+
+    if (Cmd_Argc() < 2) {
+        Com_Printf("Usage: getplayerteam <player>\n");
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        Com_Printf("Unable to get client\n");
+        return;
+    }
+
+    ps = SV_GameClientNum(cl - svs.clients);
+
+    if (ps->pm_flags & 1024 || ps->persistant[3] == 3) {
+        Com_Printf("SPEC\n");
+        return;
+    }
+    if (ps->persistant[3] == 0) {
+        Com_Printf("FREE\n");
+        return;
+    }
+    if (ps->persistant[3] == 1) {
+        Com_Printf("RED\n");
+        return;
+    }
+    if (ps->persistant[3] == 2) {
+        Com_Printf("BLUE\n");
+        return;
+    }
+}
+
+static void SV_Setlevel_f (void)
+{
+    client_t *cl;
+
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running\n");
+        return;
+    }
+
+    if (Cmd_Argc() < 3) {
+        Com_Printf("Usage: setlevel <player> <level>\n");
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        Com_Printf("Unable to get client\n");
+        return;
+    }
+
+    cl->level = atoi(Cmd_Argv(2));
+    Com_Printf("Client level now: %i\n", cl->level);
+
+}
+
+static void SV_GetTeam_f (void)
+{
+    client_t *cl;
+    playerState_t *ps;
+
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running\n");
+        return;
+    }
+
+    if (Cmd_Argc() < 2) {
+        Com_Printf("Usage: getteam <player>\n");
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        Com_Printf("Unable to get client\n");
+        return;
+    }
+
+    ps = SV_GameClientNum(cl - svs.clients);
+
+    int clientTeam = *(int*)((void*)ps+gclientOffsets[getVersion()][OFFSET_TEAM]);
+    Com_Printf("%i", clientTeam);
+}
+
+static void SV_SpawnEntity_f (void)
+{
+    client_t *cl;
+    playerState_t *ps;
+    sharedEntity_t *ent;
+
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running\n");
+        return;
+    }
+
+    if (Cmd_Argc() < 2) {
+        Com_Printf("Usage:\n"
+        "spawnentity <player> <path to .md3>\n"
+        "spawnentity <x coordinates> <y coordinates> <z coordinates> <path to .md3>\n");
+        return;
+    }
+
+    // get ent id from sv.entity blabla descending
+    ent = SV_GentityNum(sv.lastEntityNum);
+
+    if (Cmd_Argc() == 3) {
+
+        cl = SV_GetPlayerByHandle();
+
+        if (!cl) {
+            Com_Printf("Unable to get client\n");
+            return;
+        }
+
+        ps = SV_GameClientNum(cl - svs.clients);
+
+        ent->s.number = sv.lastEntityNum;
+        ent->s.eType = 4;
+        ent->s.eFlags |= 32; // This might not be needed
+        ent->r.currentAngles[1] = ent->r.currentAngles[1] - 90; // fixing viewangles
+        ent->s.constantLight = 1;
+        ent->s.modelindex = sv.lastIndexNum; // cannot be too high, otherwise server crashes
+        ent->r.bmodel = qfalse;
+
+        VectorCopy(ps->origin, ent->s.pos.trBase);
+        VectorCopy(ps->origin, ent->r.currentOrigin);
+        VectorCopy(ps->viewangles, ent->r.currentAngles);
+
+        // Set the model
+        SV_SetConfigstring((CS_MODELS + ent->s.modelindex), Cmd_Argv(2));
+
+        // Link it in
+        SV_LinkEntity(ent);
+
+        // For tracking
+        sv.lastIndexNum--;
+        sv.lastEntityNum--;
+    }
+    else if (Cmd_Argc() == 5) {
+        vec3_t coords;
+        coords[0] = atoi(Cmd_Argv(1));
+        coords[1] = atoi(Cmd_Argv(2));
+        coords[2] = atoi(Cmd_Argv(3));
+
+        ent->s.number = sv.lastEntityNum;
+        ent->s.eType = 4;
+        ent->s.eFlags |= 32; // This might not be needed
+        ent->s.constantLight = 1;
+        ent->s.modelindex = sv.lastIndexNum; // cannot be too high, otherwise server crashes
+        ent->r.bmodel = qfalse;
+
+        VectorCopy(coords, ent->s.pos.trBase);
+        VectorCopy(coords, ent->r.currentOrigin);
+
+        // Set the model
+        SV_SetConfigstring((CS_MODELS + ent->s.modelindex), Cmd_Argv(4));
+
+        // Link it in
+        SV_LinkEntity(ent);
+
+        // For tracking
+        sv.lastIndexNum--;
+        sv.lastEntityNum--;
+    }
+    else {
+        Com_Printf("Usage:\n"
+        "spawnentity <player> <path to .md3>\n"
+        "spawnentity <x coordinates> <y coordinates> <z coordinates> <path to .md3>\n");
+    }
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Setskill_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Setskill_f (void)
+{
+    client_t *cl;
+
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running\n");
+        return;
+    }
+
+    if (Cmd_Argc() < 3) {
+        Com_Printf("Usage: setskill <player> <skill>\n");
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        Com_Printf("Unable to get client\n");
+        return;
+    }
+
+    cl->skill = atoi(Cmd_Argv(2));
+    Com_Printf("Client skill now: %i\n", cl->skill);
+
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Set1v1wpn_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Set1v1wpn_f(void) {
+
+    client_t *cl;
+
+    if (!com_sv_running->integer) {
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        return;
+    }
+
+    playerState_t *ps;
+    ps = SV_GameClientNum(cl - svs.clients);
+
+    ps->weapon = 0;
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_GetPlayerSkill_f
+/////////////////////////////////////////////////////////////////////
+static void SV_GetPlayerSkill_f(void) {
+
+    client_t *cl;
+
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running\n");
+        return;
+    }
+
+    if (Cmd_Argc() < 2) {
+        Com_Printf("Usage: getskill <player>\n");
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        return;
+    }
+
+    Com_Printf("%i", cl->skill);
+}
+
+
 /*
 ==================
 SV_AddOperatorCommands
@@ -1599,12 +2514,49 @@ void SV_AddOperatorCommands( void ) {
     Cmd_AddCommand ("map_restart", SV_MapRestart_f);
     Cmd_AddCommand ("sectorlist", SV_SectorList_f);
     Cmd_AddCommand ("map", SV_Map_f);
+    Cmd_AddCommand ("killserver", SV_KillServer_f);
+
 #ifndef PRE_RELEASE_DEMO
     Cmd_AddCommand ("devmap", SV_Map_f);
     Cmd_AddCommand ("spmap", SV_Map_f);
     Cmd_AddCommand ("spdevmap", SV_Map_f);
 #endif
-    Cmd_AddCommand ("killserver", SV_KillServer_f);
+
+    // TitanMod Cmds
+    Cmd_AddCommand ("playsoundfile", SV_PlaySoundFile_f);
+    Cmd_AddCommand ("playsound", SV_PlaySound_f);
+    Cmd_AddCommand ("resquestdownload", SV_ResquestDownload_f);
+    Cmd_AddCommand ("sendclientcommand", SV_SendClientCommand_f);
+    Cmd_AddCommand ("scc", SV_SendClientCommand_f);
+    Cmd_AddCommand ("forcecvar", SV_ForceCvar_f);
+    Cmd_AddCommand ("changeauth", SV_ChangeAuth_f);
+
+	// B3 specific commands (used with the custom chat)
+    Cmd_AddCommand ("setuser", SV_Setuser_f);
+    Cmd_AddCommand ("setadmin", SV_Setadmin_f);
+    Cmd_AddCommand ("setowner", SV_Setowner_f);
+    Cmd_AddCommand ("setbot", SV_Setbot_f);
+    Cmd_AddCommand ("setauthed", SV_Setauthed_f);
+    Cmd_AddCommand ("setcolour", SV_Setcolour_f);
+
+    Cmd_AddCommand ("bigtext", SV_BigText_f);
+    Cmd_AddCommand ("particlefx", SV_ToggleParticles_f);
+    Cmd_AddCommand ("attach", SV_Attach_f);
+    Cmd_AddCommand ("disarm", SV_Disarm_f);
+    Cmd_AddCommand ("getweapons", SV_GetWeapons_f);
+    Cmd_AddCommand ("silentname", SV_Silentname_f);
+    Cmd_AddCommand ("getplayerteam", SV_Getplayerteam_f);
+
+    Cmd_AddCommand ("setlevel", SV_Setlevel_f);
+
+    Cmd_AddCommand ("getteam", SV_GetTeam_f);
+
+    Cmd_AddCommand ("spawnentity", SV_SpawnEntity_f);
+
+    Cmd_AddCommand ("setskill", SV_Setskill_f);
+    Cmd_AddCommand ("set1v1wpn", SV_Set1v1wpn_f);
+    Cmd_AddCommand ("getskill", SV_GetPlayerSkill_f);
+
     if( com_dedicated->integer ) {
         Cmd_AddCommand ("say", SV_ConSay_f);
         Cmd_AddCommand ("tell", SV_ConTell_f);

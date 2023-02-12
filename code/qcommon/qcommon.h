@@ -129,8 +129,8 @@ NET
 
 #define	PORT_ANY			-1
 
-//@Barbatos: increased it to avoid the loading map issue on servers with large amount of players (previously 64)
-#define	MAX_RELIABLE_COMMANDS	128			// max string commands buffered for restransmit
+//@Barbatos: increased it to avoid the loading map issue on servers with large amount of players (previously 64, 128)
+#define	MAX_RELIABLE_COMMANDS	256			// max string commands buffered for restransmit
 
 typedef enum {
 	NA_BOT,
@@ -417,6 +417,7 @@ char	*Cmd_Argv (int arg);
 void	Cmd_ArgvBuffer( int arg, char *buffer, int bufferLength );
 char	*Cmd_Args (void);
 char	*Cmd_ArgsFrom( int arg );
+char	*Cmd_ArgsFromRaw( int arg );
 void	Cmd_ArgsBuffer( char *buffer, int bufferLength );
 char	*Cmd_Cmd (void);
 void	Cmd_Args_Sanitize( void );
@@ -563,6 +564,7 @@ void	FS_Shutdown( qboolean closemfp );
 
 qboolean	FS_ConditionalRestart( int checksumFeed );
 void	FS_Restart( int checksumFeed );
+void	FS_Reload( void );
 // shutdown and restart the filesystem so changes to fs_gamedir can take effect
 
 char	**FS_ListFiles( const char *directory, const char *extension, int *numfiles );
@@ -654,6 +656,7 @@ const char *FS_LoadedPakPureChecksums( void );
 int FS_LoadedPakChecksumsBlob( unsigned char *dst, int dstlen );
 
 const char *FS_ReferencedPakNames( void );
+const int FS_GetCheckSumPakByName( char *name );
 const char *FS_ReferencedPakChecksums( void );
 const char *FS_ReferencedPakPureChecksums( void );
 // Returns a space separated string containing the checksums of all loaded
@@ -790,6 +793,7 @@ extern	cvar_t	*sv_paused;
 extern	cvar_t	*cl_packetdelay;
 extern	cvar_t	*sv_packetdelay;
 
+extern  cvar_t  *mod_contraband;
 // com_speeds times
 extern	int		time_game;
 extern	int		time_frontend;
@@ -1158,6 +1162,6 @@ extern huffman_t clientHuffTables;
 // last N CS will be used:
 #define PURE_COMPRESS_NUMCS 8
 
-
+void str_replace(char *target, const char *needle, const char *replacement, int destsize);
 
 #endif // _QCOMMON_H_

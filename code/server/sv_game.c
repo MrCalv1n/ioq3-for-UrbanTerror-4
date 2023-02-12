@@ -27,6 +27,74 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 botlib_export_t	*botlib_export;
 
+char (*weaponString)[15];
+
+char weaponstring42[(UT_WP_NUM_WEAPONS+3)][15] =
+{
+	"none",
+	"knife",
+	"beretta",
+	"deagle",
+	"spas12",
+	"mp5k",
+	"ump45",
+	"hk69",
+	"lr",
+	"g36",
+	"psg1",
+	"he",
+	"flash",
+	"smoke",
+	"sr8",
+	"ak103",
+	"bomb",
+	"negev",
+	"frag",
+	"m4",
+	"glock",
+	"colt",
+	"mac11",
+	"nothing",
+	"boot",
+	"knifefly"
+};
+char weaponstring43[(UT_WP_NUM_WEAPONS+3)][15] =
+{
+	"none",
+	"knife",
+	"beretta",
+	"deagle",
+	"spas12",
+	"mp5k",
+	"ump45",
+	"hk69",
+	"lr",
+	"g36",
+	"psg1",
+	"he",
+	"flash",
+	"smoke",
+	"sr8",
+	"ak103",
+	"bomb",
+	"negev",
+	"frag",
+	"m4",
+	"glock",
+	"colt",
+	"mac11",
+	"frf1",
+	"benelli",
+	"p90",
+	"magnum",
+	"fstod",
+	"nothing",
+	"boot",
+	"knifefly"
+};
+
+
+
 void SV_GameError( const char *string ) {
 	Com_Error( ERR_DROP, "%s", string );
 }
@@ -83,13 +151,34 @@ Sends a command string to a client
 ===============
 */
 void SV_GameSendServerCommand( int clientNum, const char *text ) {
+    int  cid, ready, val[10];
+    int  current;
+    char cmd[32], auth[MAX_NAME_LENGTH];
+
 	if ( clientNum == -1 ) {
 		SV_SendServerCommand( NULL, "%s", text );
 	} else {
 		if ( clientNum < 0 || clientNum >= sv_maxclients->integer ) {
 			return;
 		}
-		SV_SendServerCommand( svs.clients + clientNum, "%s", text );	
+
+        // Scan scoress game command
+        if (!Q_strncmp(text, "scoress ", 8)) {
+            if (sscanf(text, "%s %i %i %i %i %i %i %i %i %i %i %s", cmd, &cid, &val[1], &val[2], &val[3], &val[4],
+                       &val[5], &ready, &val[7], &val[8], &val[9], auth) != EOF)
+            {
+                // update the ready flag (jump timer)
+                current = svs.clients[cid].cm.ready;
+                if (current != ready) {
+                    svs.clients[cid].cm.ready = (qboolean) ready;
+                    // Set stamina and walljumps back to default
+                    svs.clients[cid].cm.infiniteStamina = 0;
+                    svs.clients[cid].cm.infiniteWallJumps = 0;
+                }
+            }
+        }
+
+		SV_SendServerCommand( svs.clients + clientNum, "%s", text );
 	}
 }
 
@@ -257,7 +346,6 @@ qboolean	SV_EntityContact( vec3_t mins, vec3_t maxs, const sharedEntity_t *gEnt,
 /*
 ===============
 SV_GetServerinfo
-
 ===============
 */
 void SV_GetServerinfo( char *buffer, int bufferSize ) {
@@ -270,7 +358,6 @@ void SV_GetServerinfo( char *buffer, int bufferSize ) {
 /*
 ===============
 SV_LocateGameData
-
 ===============
 */
 void SV_LocateGameData( sharedEntity_t *gEnts, int numGEntities, int sizeofGEntity_t,
@@ -281,13 +368,13 @@ void SV_LocateGameData( sharedEntity_t *gEnts, int numGEntities, int sizeofGEnti
 
 	sv.gameClients = clients;
 	sv.gameClientSize = sizeofGameClient;
+
 }
 
 
 /*
 ===============
 SV_GetUsercmd
-
 ===============
 */
 void SV_GetUsercmd( int clientNum, usercmd_t *cmd ) {
@@ -295,6 +382,1133 @@ void SV_GetUsercmd( int clientNum, usercmd_t *cmd ) {
 		Com_Error( ERR_DROP, "SV_GetUsercmd: bad clientNum:%i", clientNum );
 	}
 	*cmd = svs.clients[clientNum].lastUsercmd;
+
+	client_t *cl;
+	cl = &svs.clients[clientNum];
+
+	if (cl->cm.frozen > 0) {
+		cmd->forwardmove = ClampChar(0);
+		cmd->rightmove = ClampChar(0);
+		cmd->upmove = ClampChar(0);
+	}
+}
+
+// Replace function
+char *string_replace(char *orig, char *rep, char *with) {
+    char *result; // the return string
+    char *ins;    // the next insert point
+    char *tmp;    // varies
+    int len_rep;  // length of rep (the string to remove)
+    int len_with; // length of with (the string to replace rep with)
+    int len_front; // distance between rep and end of last rep
+    int count;    // number of replacements
+
+    // sanity checks and initialization
+    if (!orig || !rep)
+        return NULL;
+    len_rep = strlen(rep);
+    if (len_rep == 0)
+        return NULL; // empty rep causes infinite loop during count
+    if (!with)
+        with = "";
+    len_with = strlen(with);
+
+    // count the number of replacements needed
+    ins = orig;
+    for (count = 0; tmp = strstr(ins, rep); ++count) {
+        ins = tmp + len_rep;
+    }
+
+    tmp = result = malloc(strlen(orig) + (len_with - len_rep) * count + 1);
+
+    if (!result)
+        return NULL;
+
+    // first time through the loop, all the variable are set correctly
+    // from here on,
+    //    tmp points to the end of the result string
+    //    ins points to the next occurrence of rep in orig
+    //    orig points to the remainder of orig after "end of rep"
+    while (count--) {
+        ins = strstr(orig, rep);
+        len_front = ins - orig;
+        tmp = strncpy(tmp, orig, len_front) + len_front;
+        tmp = strcpy(tmp, with) + len_with;
+        orig += len_front + len_rep; // move to next "end of rep"
+    }
+    strcpy(tmp, orig);
+    return result;
+}
+
+
+/*
+===============
+GunMoney related
+===============
+*/
+
+// [Guns] Weapons & Items variables
+char* weapons_list[16] = { "hk69", "lr", "spas12", "m4", "psg1", "mp5k", "ak103", "negev", "g36", "sr8", "ump45", "mac11", "p90", "frf1", "benelli", "fstod" };
+char* items[3] = { "silencer", "laser", "medkit" }; // Removed helmet & vest as now given always for a throwing knife kill. 
+char* pistols[5] = { "beretta", "deagle", "colt", "glock", "magnum" };
+
+int weaponsnum = sizeof(weapons_list) / sizeof(const char*);
+int itemsnum = sizeof(items) / sizeof(const char*);
+int pistolsnum = sizeof(pistols) / sizeof(const char*);
+
+// [Guns] Ammo, Nades & Health variables
+char healthops[2] = { '+', '-' };
+
+/*
+===============
+[Guns]
+SV_NameWeapon
+Returns Weapon name
+===============
+*/
+char* SV_NameWeapon(char* weap2) {
+	char* weapon = " ";
+	if (weap2 == "sr8") {
+		weapon = "^6Sr8";
+	}
+	else if (weap2 == "ak103") {
+		weapon = "^5AK103";
+	}
+	else if (weap2 == "negev") {
+		weapon = "^4NEGEV";
+	}
+	else if (weap2 == "ump45") {
+		weapon = "^3UMP45";
+	}
+	else if (weap2 == "g36") {
+		weapon = "^5G36";
+	}
+	else if (weap2 == "hk69") {
+		weapon = "^1HK69";
+	}
+	else if (weap2 == "lr") {
+		weapon = "^5LR300";
+	}
+	else if (weap2 == "spas12") {
+		weapon = "^3Spas12";
+	}
+	else if (weap2 == "m4") {
+		weapon = "^5M4A1";
+	}
+	else if (weap2 == "psg1") {
+		weapon = "^6PSG1";
+	}
+	else if (weap2 == "mp5k") {
+		weapon = "^3MP5K";
+	}
+	else if (weap2 == "beretta") {
+		weapon = "^2Beretta";
+	}
+	else if (weap2 == "deagle") {
+		weapon = "^2Desert Eagle";
+	}
+	else if (weap2 == "colt") {
+		weapon = "^2Colt1911";
+	}
+	else if (weap2 == "magnum") {
+		weapon = "^2Magnum";
+	}
+	else if (weap2 == "glock") {
+		weapon = "^2Glock-18";
+	}
+	else if (weap2 == "fstod") {
+		weapon = "^6TOD-50";
+	}
+	else if (weap2 == "p90") {
+		weapon = "^3P90";
+	}
+	else if (weap2 == "mac11") {
+		weapon = "^3Mac11";
+	}
+	else if (weap2 == "benelli") {
+		weapon = "^3Benelli";
+	}
+	else if (weap2 == "frf1") {
+		weapon = "^6FRF1";
+	}
+	return weapon;
+}
+
+/*
+===============
+[Guns]
+SV_NameItem
+Returns Item name
+===============
+*/
+char* SV_NameItem(char* item2) {
+	char* item = " ";
+	if (item2 == "silencer") {
+		item = "Silencer";
+	}
+	else if (item2 == "laser") {
+		item = "Laser Sight";
+	}
+	else if (item2 == "medkit") {
+		item = "^6Super^3 ^2Medkit";
+	}
+	else if (item2 == "vest") {
+		item = "Kevlar";
+	}
+	else if (item2 == "helmet") {
+		item = "Helmet";
+	}
+	return item;
+}
+
+qboolean wasKillNoscope(client_t* klr) {
+	qboolean noscope = qfalse;
+	if (klr->lastUsercmd.buttons == 67585 || klr->lastUsercmd.buttons == 2081 || klr->lastUsercmd.buttons == 2049 || klr->lastUsercmd.buttons == 67841 || klr->lastUsercmd.buttons == 2049 || klr->lastUsercmd.buttons == 2305) {
+		noscope = qtrue;
+	}
+	return noscope;
+}
+
+/*
+====================
+Events that we created in files.c
+====================
+*/
+
+
+void SV_OnMapExit(void)
+{	
+	if (mod_zombiemod->integer) {
+		Cmd_ExecuteString("swapteams");
+		Cmd_ExecuteString("say \"^3The ^2Teams ^3have been ^5swapped\n^3Press ^1TAB ^3to view the ^5scoreboard\"");
+		Cmd_ExecuteString("bigtext \"^3The ^2Teams ^3have been ^5swapped\n\n\n^3Press ^1TAB ^3to view the ^5scoreboard\"");
+	}
+}
+
+void SV_onKill(char* killer, char* killed, char* wpn)
+{
+	if (mod_announceNoscopes->integer) {
+		// No suicide or world kills
+		if ((Q_stricmp(killer, "1022") != 0) || ((Q_stricmp(killer, killed) != 0))) {
+
+			// Check that the weapon for the kill is a sniper
+			if ((!Q_stricmp(wpn, "28:")) || (!Q_stricmp(wpn, "21:")) || (!Q_stricmp(wpn, "42:"))) {
+				client_t* klr = &svs.clients[atoi(killer)];;
+				if (wasKillNoscope(klr)) {
+					client_t* kld = &svs.clients[atoi(killed)];;
+					SV_SendServerCommand(NULL, "cchat \"\" \"^6%s ^3just ^2noscoped ^5%s!\"", klr->name, kld->name);
+				}
+			}
+		}
+	}
+
+	if (mod_gunsmod->integer){
+
+		client_t* klr;
+		client_t* kld;
+
+		if (Q_stricmp(killer, "1022") != 0)
+		{
+			klr = &svs.clients[atoi(killer)];
+			kld = &svs.clients[atoi(killed)];
+			playerState_t *ps;
+    	    int cid;
+    	    cid = klr - svs.clients;
+			ps = SV_GameClientNum(cid);
+			kld->hasmedkit = qfalse;
+			if (Q_stricmp(killer, killed) != 0){ // no suicide
+
+				// Knife
+				//SV_SendServerCommand(klr, "cchat \"\" \"^1DEBUG: ^5Weapon key: ^6%s\"", wpn);
+				if (!Q_stricmp(wpn, "12:")) {
+					int health2 = (rand() % 100) + 1;
+					Cmd_ExecuteString(va("addhealth %s +%i", killer, health2));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^1Knife ^7kill ^1= ^7Health: ^2+%i\"", health2);
+				}
+				// Knife thrown
+				else if (!Q_stricmp(wpn, "13:")) {
+					int random = rand() % itemsnum;
+					char* item = items[random];
+					Cmd_ExecuteString(va("gi %i vest", ps->clientNum));
+					Cmd_ExecuteString(va("gi %i helmet", ps->clientNum));
+					Cmd_ExecuteString(va("gi %i %s", ps->clientNum, item));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^1Throwing Knife ^7kill ^1= ^6%s ^3and ^2Vest+Helmet\"", SV_NameItem(item));
+					Cmd_ExecuteString(va("exec thrown.txt"));
+					if (!Q_stricmp(SV_NameItem(item), "^6Super^3 ^2Medkit")) {
+						klr->hasmedkit = qtrue;
+					}
+				}
+				// Beretta
+				else if (!Q_stricmp(wpn, "14:")) {
+					int random = rand() % weaponsnum;
+					char* weapon = weapons_list[random];
+					Cmd_ExecuteString(va("gw %s %s", killer, weapon));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^2Beretta ^7kill ^1= %s\"", SV_NameWeapon(weapon));
+				}
+				// Desert Eagle
+				else if (!Q_stricmp(wpn, "15:")) {
+					int random = rand() % weaponsnum;
+					char* weapon = weapons_list[random];
+					Cmd_ExecuteString(va("gw %s %s", killer, weapon));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^2Desert Eagle ^7kill ^1= %s\"", SV_NameWeapon(weapon));
+				}
+				// Spas
+				else if (!Q_stricmp(wpn, "16:")) {
+					int random = rand() % weaponsnum;
+					char* weapon = weapons_list[random];
+					int amo2 = (rand() % 255) + 1;
+					Cmd_ExecuteString(va("gw %s %s +%i 0", killer, weapon, amo2));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^3Spas12 ^7kill ^1= %s ^4+%i\"", SV_NameWeapon(weapon), amo2);
+				}
+				// Benelli
+				else if (!Q_stricmp(wpn, "43:")) {
+					int random = rand() % weaponsnum;
+					char* weapon = weapons_list[random];
+					int amo2 = (rand() % 255) + 1;
+					Cmd_ExecuteString(va("gw %s %s +%i 0", killer, weapon, amo2));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^3Benelli ^7kill ^1= %s ^4+%i\"", SV_NameWeapon(weapon), amo2);
+				}
+				// UMP45
+				else if (!Q_stricmp(wpn, "17:")) {
+					char* weapon = "beretta";
+					Cmd_ExecuteString(va("gw %s %s +30 0", killer, weapon));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^3UMP45 ^7kill ^1= %s ^4+30\"", SV_NameWeapon(weapon));
+				}
+				// MP5K
+				else if (!Q_stricmp(wpn, "18:")) {
+					char* weapon = "deagle";
+					Cmd_ExecuteString(va("gw %s %s +15 0", killer, weapon));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^3MP5K ^7kill ^1= %s ^4+15\"", SV_NameWeapon(weapon));
+				}
+				// LR
+				// else if (!Q_stricmp( wpn, "19:" )) {
+
+				// }
+				// G36
+				// else if (!Q_stricmp( wpn, "20:" )) {
+
+				// }
+				// PSG1
+				else if (!Q_stricmp(wpn, "21:")) {
+					char* weapon = "he";
+					int nades2 = (rand() % 50) + 1;
+					Cmd_ExecuteString(va("gw %s %s %i 0", killer, weapon, nades2));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^6PSG1 ^7kill ^1= ^6Grenades ^4+%i\"", nades2);
+				}
+				// HK69
+				else if ((!Q_stricmp(wpn, "22:")) || (!Q_stricmp(wpn, "37:"))) {
+					int health2 = (rand() % 100) + 1;
+					char operator = healthops[rand() % 2];
+					Cmd_ExecuteString(va("addhealth %s %c%i", killer, operator, health2));
+					if (operator == '-') {
+						SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^1HK69 ^7kill ^1= ^7Random Health: ^1-%i\"", health2);
+					}
+					else if (operator == '+') {
+						SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^1HK69 ^7kill ^1= ^7Random Health: ^2+%i\"", health2);
+					}
+				}
+				// BLEED
+				else if (!Q_stricmp(wpn, "23:")) {
+					int random = rand() % itemsnum;
+					char* item = items[random];
+					Cmd_ExecuteString(va("gi %s %s", killer, item));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^1Bleeding ^7kill ^1= ^6%s\"", SV_NameItem(item));
+					if (!Q_stricmp(SV_NameItem(item), "^6Super^3 ^2Medkit")) {
+						klr->hasmedkit = qtrue;
+					}
+				}
+				// BOOT (KICKED)
+				else if (!Q_stricmp(wpn, "24:")) {
+					Cmd_ExecuteString(va("addhealth %s +100", killer));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^6Boot ^7kill ^1= ^2Full ^7Health\"");
+					Cmd_ExecuteString(va("exec kicked.txt"));
+				}
+				// HE NADE
+				else if (!Q_stricmp(wpn, "25:")) {
+					int random = rand() % itemsnum;
+					char* item = items[random];
+					Cmd_ExecuteString(va("gi %s %s", killer, item));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^1HE Grenade ^7kill ^1= ^6%s\"", SV_NameItem(item));
+					if (!Q_stricmp(SV_NameItem(item), "^6Super^3 ^2Medkit")) {
+						klr->hasmedkit = qtrue;
+					}
+				}
+				// SR8
+				else if (!Q_stricmp(wpn, "28:")) {
+					char* weapon = "he";
+					int nades2 = (rand() % 50) + 1;
+					Cmd_ExecuteString(va("gw %s %s +%i 0", killer, weapon, nades2));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^6Sr8 ^7kill ^1= ^6Grenades ^4+%i\"", nades2);
+				}
+				// FRF1
+				else if (!Q_stricmp(wpn, "42:")) {
+					char* weapon = "he";
+					int nades2 = (rand() % 50) + 1;
+					Cmd_ExecuteString(va("gw %s %s +%i 0", killer, weapon, nades2));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^6FRF1 ^7kill ^1= ^6Grenades ^4+%i\"", nades2);
+				}
+				// AK103
+				// else if (!Q_stricmp( wpn, "30:" )) {
+
+				// }
+				// NEGEV
+				else if (!Q_stricmp(wpn, "36:")) {
+					int health2 = (rand() % 100) + 1;
+					char operator = healthops[rand() % 2];
+					Cmd_ExecuteString(va("addhealth %s %c%i", killer, operator, health2));
+					if (operator == '-') {
+						SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^4NEGEV ^7kill ^1= ^7Random Health: ^1-%i\"", health2);
+					}
+					else if (operator == '+') {
+						SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^4NEGEV ^7kill ^1= ^7Random Health: ^2+%i\"", health2);
+					}
+				}
+				// M4
+				// else if (!Q_stricmp( wpn, "38:" )) {
+
+				// }
+				// CURB (GOOMBA)
+				else if (!Q_stricmp(wpn, "48:")) {
+					Cmd_ExecuteString(va("gw %i hk69 100 100", ps->clientNum));
+					Cmd_ExecuteString(va("gw %i spas12 255 255", ps->clientNum));
+					Cmd_ExecuteString(va("gw %i smoke 25 0", ps->clientNum));
+					Cmd_ExecuteString(va("gi %i silencer", ps->clientNum));
+					Cmd_ExecuteString(va("gi %i laser", ps->clientNum));
+					Cmd_ExecuteString(va("gi %i medkit", ps->clientNum));
+					Cmd_ExecuteString(va("gi %i vest", ps->clientNum));
+					Cmd_ExecuteString(va("gi %i helmet", ps->clientNum));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^6Curb Stomp ^7kill ^1= ^5HK69/SPAS12/Smokes ^3and ^6all Items\"");
+					Cmd_ExecuteString(va("bigtext \"%s made a ^6Curb Stomp^7!!\n^3He won ^5HK69/SPAS12/Smokes ^3and ^6all Items\"", klr->name));
+					Cmd_ExecuteString(va("exec goomba.txt"));
+				}
+				// Glock
+				else if (!Q_stricmp(wpn, "39:")) {
+					int random = rand() % weaponsnum;
+					char* weapon = weapons_list[random];
+					Cmd_ExecuteString(va("gw %s %s", killer, weapon));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^2Glock 18 ^7kill ^1= %s\"", SV_NameWeapon(weapon));
+				}
+				// Colt
+				else if (!Q_stricmp(wpn, "40:")) {
+					int random = rand() % weaponsnum;
+					char* weapon = weapons_list[random];
+					Cmd_ExecuteString(va("gw %s %s", killer, weapon));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^2Colt-1911 ^7kill ^1= %s\"", SV_NameWeapon(weapon));
+				}
+				// Magnum
+				else if (!Q_stricmp(wpn, "45:")) {
+					int random = rand() % weaponsnum;
+					char* weapon = weapons_list[random];
+					Cmd_ExecuteString(va("gw %s %s", killer, weapon));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^2Magnum ^7kill ^1= %s\"", SV_NameWeapon(weapon));
+				}
+				// MAC-11
+				else if (!Q_stricmp(wpn, "41:")) {
+					int random = rand() % pistolsnum;
+					char* weapon = pistols[random];
+					Cmd_ExecuteString(va("gw %s %s +30 0", killer, weapon));
+					SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^3MAC-11 ^7kill ^1= %s ^4+30\"", SV_NameWeapon(weapon));
+				}
+				// P90
+				else if (!Q_stricmp(wpn, "44:")) {
+				int random = rand() % pistolsnum;
+				char* weapon = pistols[random];
+				Cmd_ExecuteString(va("gw %s %s +30 0", killer, weapon));
+				SV_SendServerCommand(klr, "cchat \"\" \"^6~^8> ^3P90 ^7kill ^1= %s ^4+30\"", SV_NameWeapon(weapon));
+				}
+			}
+		}
+	}
+}
+
+void parseClientSettings(client_t *client, char* message) {
+	const char *s;
+	s = message;
+	Cmd_TokenizeString(s);
+	char *type;
+	char *data;
+
+	if (strcmp(Cmd_Argv(0), "!preference") == 0) {
+		data = Cmd_Argv(1);		
+		
+		if (strcmp(data, "primary") == 0) {
+			client->preference = ARENA_PRIMARY;
+			SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Preference ^3set to ^2PRIMARY.\"");
+		}
+		else if (strcmp(data, "secondary") == 0) {
+			client->preference = ARENA_SECONDARY;
+			SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Preference ^3set to ^2SECONDARY.\"");
+		}
+		else if (strcmp(data, "pistol") == 0) {
+			client->preference = ARENA_PISTOL;
+			SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Preference ^3set to ^2PISTOL.\"");
+		}
+		else if (strcmp(data, "sniper") == 0) {
+			client->preference = ARENA_SNIPER;
+			SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Preference ^3set to ^2SNIPER.\"");
+		}
+		else if (strcmp(data, "knife") == 0) {
+			client->preference = ARENA_KNIFE;
+			SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Preference ^3set to ^2KNIFE.\"");
+		}
+		else if (strcmp(data, "gib") == 0) {
+			client->preference = ARENA_GIB;
+			SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Preference ^3set to ^2GIB.\"");
+		} else {
+			SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^1Error: [Unknown preference] ^3See ^2!guns ^3for a list of preferences.\"");
+		}
+	}
+
+	else if (strcmp(Cmd_Argv(0), "!set") == 0) {
+		type = Cmd_Argv(1);
+		data = Cmd_Argv(2);
+
+		if (strcmp(type, "primary") != 0 && strcmp(type, "secondary") != 0 && strcmp(type, "pistol") != 0 && strcmp(type, "sniper") != 0) {
+			SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^1Error: [Unknown Type] ^3See ^2!guns ^3for a list of types.\"");
+		}                 
+
+		else if (strcmp(type, "primary") == 0) {
+			if (strcmp(data, "lr300") == 0) {
+				client->primary = ARENA_LR300;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Primary ^3set to ^2LR300.\"");
+			}
+			else if (strcmp(data, "g36") == 0) {
+				client->primary = ARENA_G36;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Primary ^3set to ^2G36.\"");
+			}
+			else if (strcmp(data, "ak103") == 0) {
+				client->primary = ARENA_AK103;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Primary ^3set to ^2AK103.\"");
+			}
+			else if (strcmp(data, "m4") == 0) {
+				client->primary = ARENA_M4;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Primary ^3set to ^2M4.\"");
+			}
+			else if (strcmp(data, "negev") == 0) {
+				client->primary = ARENA_NEGEV;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Primary ^3set to ^2NEGEV.\"");
+			}
+			else if (strcmp(data, "hk69") == 0) {
+				client->primary = ARENA_HK69;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Primary ^3set to ^2HK69.\"");
+			}
+			else {
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^1Error: [Unknown Weapon] ^3See ^2!guns ^3for exact weapon names.\"");
+			}
+		}
+
+		else if (strcmp(type, "secondary") == 0) {				
+			if (strcmp(data, "ump45") == 0) {
+				client->secondary = ARENA_UMP45;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Secondary ^3set to ^2UMP45.\"");		
+			}		
+			else if (strcmp(data, "mac11") == 0) {
+				client->secondary = ARENA_MAC11;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Secondary ^3set to ^2MAC11.\"");
+			}
+			else if (strcmp(data, "p90") == 0) {
+				client->secondary = ARENA_P90;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Secondary ^3set to ^2P90.\"");
+			}
+			else if (strcmp(data, "mp5k") == 0) {
+				client->secondary = ARENA_MP5K;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Secondary ^3set to ^2MP5K.\"");
+			}
+			else if (strcmp(data, "spas12") == 0) {
+				client->secondary = ARENA_SPAS12;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Secondary ^3set to ^2SPAS12.\"");
+			}
+			else if (strcmp(data, "benelli") == 0) {
+				client->secondary = ARENA_BENELLI;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Secondary ^3set to ^2BENELLI.\"");
+			}
+			else {
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^1Error: [Unknown Weapon] ^3See ^2!guns ^3for exact weapon names.\"");
+			}
+		}
+
+		else if (strcmp(type, "pistol") == 0) {
+			if (strcmp(data, "beretta") == 0) {
+				client->pistol = ARENA_BERETTA;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Pistol ^3set to ^2BERETTA.\"");
+			}
+			else if (strcmp(data, "deagle") == 0) {
+				client->pistol = ARENA_DEAGLE;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Pistol ^3set to ^2DEAGLE.\"");
+			}
+			else if (strcmp(data, "colt") == 0) {
+				client->pistol = ARENA_COLT;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Pistol ^3set to ^2COLT.\"");
+			}
+			else if (strcmp(data, "glock") == 0) {
+				client->pistol = ARENA_GLOCK;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Pistol ^3set to ^2GLOCK.\"");
+			}
+			else if (strcmp(data, "magnum") == 0) {
+				client->pistol = ARENA_MAGNUM;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Pistol ^3set to ^2MAGNUM.\"");
+			}
+			else {
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^1Error: [Unknown Weapon] ^3See ^2!guns ^3for exact weapon names.\"");
+			}
+		}
+
+		else if (strcmp(type, "sniper") == 0) {
+			if (strcmp(data, "psg1") == 0) {
+				client->sniper = ARENA_PSG1;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Sniper ^3set to ^2PSG1.\"");
+			}
+			else if (strcmp(data, "sr8") == 0) {
+				client->sniper = ARENA_SR8;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Sniper ^3set to ^2SR8.\"");
+			}
+			else if (strcmp(data, "frf1") == 0) {
+				client->sniper = ARENA_FRF1;
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^5Sniper ^3set to ^2FRF1.\"");
+			}
+			else {
+				SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^1Error: [Unknown Weapon] ^3See ^2!guns ^3for exact weapon names.\"");
+			}
+		}
+	}
+}
+
+void SV_onChat(char* playerid, char* playername, char* message)
+{
+	client_t* cl;
+	cl = &svs.clients[atoi(playerid)];
+
+	if (mod_gunsmod->integer){
+        if (strcmp(message, "!kitlist") == 0) {
+            SV_SendServerCommand(cl, "print  \"^7 Kitlist v0.1 (29/01/2022)\n\"");
+            SV_SendServerCommand(cl, "print  \"^3////////////////////////////////////////////////////////////////////////////\n\"");
+        	SV_SendServerCommand(cl, "print  \"^3//               ^1! BUYING A KIT WILL LOSE ALL YOUR WEAPONS !              ^3//\n\"");
+	        SV_SendServerCommand(cl, "print  \"^3//-----------------------------------^3/------------------------------------^3//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7////////////////////////////////////////////////////////////////////////////\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//               Armor               ^7/             Attachments            ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//-----------------------------------^7/------------------------------------^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7// ^3Kevlar Vest                       ^7/  ^3Laser                             ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7// ^3Helmet                            ^7/  ^3Silencer                          ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//           ^2Price:^6 1620 coins       ^7/  ^3Clips (-2x500 coins per weapon)   ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//                                   ^7/      ^2Base Price:^6  900 coins        ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//........................................................................^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//               Rifles              ^7/               Snipers              ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//-----------------------------------^7/------------------------------------^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7// ^3M4                                ^7/  ^3SR8                               ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7// ^3LR300                             ^7/  ^3FRF1                              ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7// ^3AK103                             ^7/  ^3PSG1                              ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//           ^2Price:^6 13545 coins      ^7/           ^2Price:^6 21600 coins       ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//........................................................................^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//            Secondaries            ^7/                                    ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//-----------------------------------^7/------------------------------------^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7// ^3MP5K                              ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3Mac11                             ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3P90                               ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3Spas12                            ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//           ^2Price:^6 19575 coins      ^7/                                    ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//........................................................................^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^5Usage:                                                                ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  !kit <KIT SHORT/NAME>  for example: !kit armor / !kit ar              ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//                                      !kit attachments / !kit att       ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7////////////////////////////////////////////////////////////////////////////\n\"");
+			SV_SendServerCommand(cl, "chat  \"^2Kitlist ^3sent to your console -> switch to the ^5'Chat' tab!");
+		}
+      else if (strcmp(message, "!buylist") == 0) {
+            SV_SendServerCommand(cl, "print  \"^7 Buylist v2.1 (12/12/2021)\n\"");
+            SV_SendServerCommand(cl, "print  \"^7////////////////////////////////////////////////////////////////////////////\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//           Sniper Rifles           ^7/         Assault Rifles             ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//-----------------------------------^7/------------------------------------^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3sr8     ^2Price:^6 8000 coins         ^7/  ^3lr300    ^2Price:^6 5500 coins        ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3psg1    ^2Price:^6 8000 coins         ^7/  ^3g36      ^2Price:^6 6000 coins        ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3frf1    ^2Price:^6 8000 coins         ^7/  ^3ak103    ^2Price:^6 7000 coins        ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//                                   ^7/  ^3M4       ^2Price:^6 2550 coins        ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//........................................................................^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//             SMG's                 ^7/              Shotguns              ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//-----------------------------------^7/------------------------------------^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3ump45   ^2Price:^6 3250 coins         ^7/  ^3spas12   ^2Price:^6 12000 coins       ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3mp5k    ^2Price:^6 3250 coins         ^7/  ^3benelli  ^2Price:^6 10000 coins       ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3p90     ^2Price:^6 3250 coins         ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3mac11   ^2Price:^6 3250 coins         ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//........................................................................^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//           Machine Guns            ^7/             Specials               ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//-----------------------------------^7/------------------------------------^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3negev      ^2Price:^6 4000 coins      ^7/  ^3fstod    ^2Price:^6  30000 coins      ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//                                   ^7/  ^3hk69     ^2Price:^6  10000 coins      ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//........................................................................^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//             Abilites              ^7/             Equipment              ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//-----------------------------------^7/------------------------------------^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!disarm    ^2Price:^6 500000  coins   ^7/  ^3Vest     ^2Price:^6 1000 coins        ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!invisible ^2Price:^6 750000  coins   ^7/  ^3Helmet   ^2Price:^6  800 coins        ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!ammo      ^2Price:^6  65000  coins   ^7/  ^3Silencer ^2Price:^6  500 coins        ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!clips     ^2Price:^6  45000  coins   ^7/  ^3Laser    ^2Price:^6  500 coins        ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!maptp     ^2Price:^6  50000  coins   ^7/  ^3NVG      ^2Price:^6 3000 coins        ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!lowgrav   ^2Price:^6 1000000 coins   ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!slapall   ^2Price:^6 1000000 coins   ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!b health  ^2Price:^6  15000  coins   ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!laugh     ^2Price:^6  25000  coins   ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!teleport  ^2Price:^6 250000  coins   ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!freeze    ^2Price:^6 550000  coins   ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!nades     ^2Price:^6 500000  coins   ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!slick     ^2Price:^6 500000  coins   ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!crazy     ^2Price:^6 1000000 coins   ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!overclock ^2Price:^6 500000  coins   ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!airjumps  ^2Price:^6 1000000 coins   ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!superbots ^2Price:^6 1000000 coins   ^7/                                    ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7// ^3!vampire <amount> 1 minute = 10000 coins                               ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//........................................................................^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//  ^5Specials:                                                             ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//  !gamble <amount> (Gamble for a 50/50 chance to tripple your input!)   ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//  !particles (Will activate particles around you)^2Price:^610000000 coins^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//  !buycolour <colour number> ^2Price: ^610000000 coins                      ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//  colours: ^11^7=^1red ^22^7=^2green ^33^7=^3yellow ^44^7=^4blue ^55^7=^5cyan ^66^7=^6purple ^88^7=^8orange ^99^7=^9grey^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//  ^5Usage:                                                                ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//  !buy <WEAPON NAME>     for example: !buy sr8                          ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//  !buy <ITEM NAME>       for example: !buy vest                         ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//  ^5Autobuy:                                                              ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//  !buy <WEAPON NAME> ON  for example: !buy sr8 on                       ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//  !buy <ITEM NAME> ON    for example: !buy vest on                      ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//  ^5Abilites:                                                             ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//  !maptp (no !b required, simply use !<ability name>)                   ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7//  !heal                                                                 ^7//\n\"");
+            SV_SendServerCommand(cl, "print  \"^7////////////////////////////////////////////////////////////////////////////\n\"");
+            SV_SendServerCommand(cl, "chat  \"^2Buylist ^3sent to your console -> switch to the ^5'Chat' tab!");
+        }
+	}
+	if (mod_1v1arena->integer){
+    	if (strcmp(message, "!guns") == 0) {
+			SV_SendServerCommand(cl, "print  \"^7////////////////////////////////////////////////////////////////////////////\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//                                                                        ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^5Gun menu                                                              ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//                                                                        ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^5Usage:                                                                ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^2!set ^6<type> <weapon>                                                  ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^2!preference ^6<type>                                                    ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//                                                                        ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^5Types:                                                                ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^4primary / secondary / pistol / sniper / knife / gib                   ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//                                                                        ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^5Weapons:                                                              ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^2Primary: ^4lr300, g36, ak103, m4, negev, hk69                           ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^2Secondary: ^4ump45, mac11, p90, mp5k, spas12, benelli                   ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^2Pistol: ^4beretta, deagle, colt, glock, magnum                          ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^2Sniper: ^4psg1, sr8, frf1                                               ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//                                                                        ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//                                                                        ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^5Usage:                                                                ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^2!set ^6primary lr300                                                    ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^2!set ^6secondary ump45                                                  ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^2!set ^6pistol deagle                                                    ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^2!set ^6sniper sr8                                                       ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//  ^2!preference ^6primary                                                   ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7//                                                                        ^7//\n\"");
+			SV_SendServerCommand(cl, "print  \"^7////////////////////////////////////////////////////////////////////////////\n\"");
+		}
+		// check if !set is part of the message string
+		if (strstr(message, "!set") != NULL || strstr(message, "!preference") != NULL) {
+			parseClientSettings(cl, message);
+		}
+
+	}
+	if (mod_gunsmod->integer) {
+
+		if (cl->muted) {
+			// prevent muted players from spamming sounds
+			return;
+		}
+
+		unsigned int time = Com_Milliseconds();
+		if ((time - cl->lastsoundtime) < 15000) {
+			// prevent spammers from spamming sounds (1 sound every 15 seconds)
+			return;
+		}
+
+		if ((strcmp(message, "hi") == 0) || (strcmp(message, "hello") == 0) || (strcmp(message, "hallo") == 0) || (strcmp(message, "salut") == 0) || (strcmp(message, "hey") == 0) || (strcmp(message, "ciao") == 0))  {
+			Cmd_ExecuteString(va("exec sound_hello.txt"));
+			cl->lastsoundtime = time;
+		}
+		if ((strcmp(message, "n1") == 0) || (strcmp(message, "nice one") == 0) || (strcmp(message, "nice") == 0))  {
+			Cmd_ExecuteString(va("exec sound_nice.txt"));
+			cl->lastsoundtime = time;
+		}
+		if ((strcmp(message, "wtf") == 0) || (strcmp(message, "WTF") == 0) || (strcmp(message, "what the fuck") == 0))  {
+			Cmd_ExecuteString(va("exec sound_wtf.txt"));
+			cl->lastsoundtime = time;
+		}
+		if ((strcmp(message, "hru") == 0) || (strcmp(message, "how you doin") == 0) || (strcmp(message, "how are you") == 0))  {
+			Cmd_ExecuteString(va("exec sound_hru.txt"));
+			cl->lastsoundtime = time;
+		}
+		if (strcmp(message, "whatever") == 0) {
+			Cmd_ExecuteString(va("exec sound_whatever.txt"));
+			cl->lastsoundtime = time;
+		}
+		if ((strcmp(message, "thanks") == 0) || (strcmp(message, "ty") == 0) || (strcmp(message, "thx") == 0))  {
+			Cmd_ExecuteString(va("exec sound_thanks.txt"));
+			cl->lastsoundtime = time;
+		}
+		if ((strcmp(message, "idiot") == 0) || (strcmp(message, "dumbass") == 0) || (strcmp(message, "you idiot") == 0))  {
+			Cmd_ExecuteString(va("exec sound_idiot.txt"));
+			cl->lastsoundtime = time;
+		}
+		if ((strcmp(message, "sorry") == 0) || (strcmp(message, "sry") == 0) || (strcmp(message, "soz") == 0))  {
+			Cmd_ExecuteString(va("exec sound_sorry.txt"));
+			cl->lastsoundtime = time;
+		}
+		if ((strcmp(message, "np") == 0) || (strcmp(message, "no problem") == 0) || (strcmp(message, "no worries") == 0))  {
+			Cmd_ExecuteString(va("exec sound_np.txt"));
+			cl->lastsoundtime = time;
+		}
+		if ((strcmp(message, "status") == 0) || (strcmp(message, "whats up") == 0) || (strcmp(message, "status?") == 0) || (strcmp(message, "sup") == 0))  {
+			Cmd_ExecuteString(va("exec sound_status.txt"));
+			cl->lastsoundtime = time;
+		}
+		if (strcmp(message, "lol") == 0)  {
+			Cmd_ExecuteString(va("exec sound_lol.txt"));
+			cl->lastsoundtime = time;
+		}
+	}
+}
+
+int getClientTeam(client_t *cl) {
+	int team = -1;
+	playerState_t *ps;
+	ps = SV_GameClientNum(cl - svs.clients);
+	team = *(int*)((void*)ps+gclientOffsets[getVersion()][OFFSET_TEAM]);
+	return team;
+}
+
+/*
+===============
+Ghostmode on roundstart
+===============
+*/
+
+void SV_SurvivorRoundStart(void) {
+
+	// The entities reset every single round, so reset the counter too
+	if (sv.lastEntityNum != 1010) {
+		sv.lastEntityNum = 1010;
+	}
+	if (sv.lastIndexNum != 255) {
+		sv.lastIndexNum = 255;
+	}
+
+	if (sv_ghostOnRoundstart->integer) {
+		sv.checkGhostMode = qtrue;
+		sv.stopAntiBlockTime = Com_Milliseconds() + 10000;;
+		Cmd_ExecuteString(va("mod_ghostPlayers 1"));
+	}
+
+	if (sv_TurnpikeBlocker->integer) {
+
+		sv.currplayers = 0;
+
+		client_t *cl;
+		int i;
+
+        for (i = 0, cl = svs.clients; i < sv_maxclients->integer; i++, cl++) {
+			if (cl->state == CS_ACTIVE) {
+				int team = getClientTeam(cl);
+				if (team != 3 && team != -1) { // Do not count specs
+					sv.currplayers++;
+				}
+            }
+		}
+	}
+}
+
+/*
+===============
+1v1 Arena related
+
+This has to be done here
+The files.c event is fired
+too quick
+===============
+*/
+
+
+
+/*
+===============
+Levelsystem Related
+
+using different event handler here
+as the one from gunmoney doesn't
+work as intended for this
+===============
+*/
+
+/////////////////////////////////////////////////////////////////////
+// EV_PlayerSpawn
+/////////////////////////////////////////////////////////////////////
+void EV_PlayerSpawn(int cnum)
+{
+	if(cnum < 0 || cnum > sv_maxclients->integer)
+		return;
+
+	SV_WeaponMod(cnum);
+
+    if (sv_gametype->integer == GT_JUMP) {
+        client_t *cl;
+        cl = cnum + svs.clients;
+        cl->cm.ready = 0;
+    }
+
+}
+
+/////////////////////////////////////////////////////////////////////
+// EV_ClientUserInfoChanged
+/////////////////////////////////////////////////////////////////////
+void EV_ClientUserInfoChanged(int cnum)
+{
+	if(cnum < 0 || cnum > sv_maxclients->integer)
+		return;
+
+	SV_WeaponMod(cnum);
+
+	
+	if (mod_1v1arena->integer) {
+
+		client_t* client;
+		client = cnum + svs.clients;
+
+		// clean playername
+    	char cleanName[64];
+        Q_strncpyz(cleanName, client->name, sizeof(cleanName));
+        Q_CleanStr(cleanName );
+
+		memset(client->defaultconfigstr,0,sizeof(client->defaultconfigstr));
+
+		char* mystring = Q_CleanStr(sv.configstrings[cnum + 544]);
+		char* toreplace = va("%s", cleanName);
+		char* replacewith = "XXXXXXXXXXXXX";
+		char* somestring = string_replace(mystring, toreplace, replacewith);
+		char mynewstring[256];
+		Q_strncpyz(mynewstring, somestring, sizeof(mynewstring));
+		Q_strncpyz(client->defaultconfigstr, mynewstring, sizeof(client->defaultconfigstr));
+
+		// clear the current customname
+		memset(client->lastcustomname,0,sizeof(client->lastcustomname));
+		
+		const char* mynewname;
+		// Set our name:
+		if (client->arena == 99) {
+			mynewname = va("^7[^5No Arena^7]^3%s^2", cleanName);
+		} else {
+			mynewname = va("^7[^3Arena ^5%i^7]^3%s^2", client->arena+1, cleanName);
+		}
+
+		// Set the new custom name
+		Q_strncpyz(client->lastcustomname, mynewname, sizeof(client->lastcustomname));
+
+		// Finally tell the server to use the new name
+		client->customname = qtrue;
+
+		// Shoot a location update for the new name
+		playerState_t *ps;
+		ps = SV_GameClientNum(cnum);
+
+		int team;
+		team = *(int*)((void*)ps+gclientOffsets[getVersion()][OFFSET_TEAM]);
+		if (team == 3) {
+			Cmd_ExecuteString(va("location %i \"^7[^3Arena ^5SPEC^7][^3Skill ^5%i^7]\" 0 1", client->playernum, client->skill));
+		} else if (sv.Arenas[client->arena].population == 1) {
+			Cmd_ExecuteString(va("location %i \"^7[^3Arena ^5%i^7][^3Skill ^5%i^7] ^5- ^3facing ^1no opponent\" 0 1", client->playernum, client->arena, client->skill));
+		} else {
+			client_t *cl2;
+			if (sv.Arenas[client->arena].player1num == client->playernum) {
+				cl2 = &svs.clients[sv.Arenas[client->arena].player2num];
+			} else {
+				cl2 = &svs.clients[sv.Arenas[client->arena].player1num];
+			}
+			Cmd_ExecuteString(va("location %i \"^7[^3Arena ^5%i^7][^3Skill ^5%i^7] ^5- ^3facing ^6%s\" 0 1", client->playernum, client->arena, client->skill, cl2->colourName));
+		}
+	}
+
+	if (mod_jumpSpecAnnouncer->integer) {
+
+		// Save the client cid
+        client_t* 	client;
+        client = cnum + svs.clients;
+		client->cid = cnum;
+
+		// clean playername
+    	char cleanName[64];
+        Q_strncpyz(cleanName, client->name, sizeof(cleanName));
+        Q_CleanStr(cleanName );
+
+		// check if this is called on a namechange, currspecd etc must exist
+		if (client->cidCurrSpecd != -1) {
+			client_t *speccedClient = client->cidCurrSpecd + svs.clients;
+			removeFromClientsList(client);
+			addToClientsList(speccedClient, client);
+			//forceLocationUpdate(speccedClient); // FIXME
+		}
+
+		// Set it to 0 just in case
+		memset(client->nameConfigString,0,sizeof(client->nameConfigString));
+
+		// Save a config string for easy name editing
+		char* mystring = Q_CleanStr(sv.configstrings[cnum + 544]);
+		char* toreplace = va("%s", cleanName);
+		char* replacewith = "XXXXXXXXXXXXX"; // This is what we're replacing in the future
+		char* somestring = string_replace(mystring, toreplace, replacewith);
+		char mynewstring[256];
+		Q_strncpyz(mynewstring, somestring, sizeof(mynewstring));
+		Q_strncpyz(client->nameConfigString, mynewstring, sizeof(client->nameConfigString));
+
+		// Save the clients name for future namechange updates
+		Q_strncpyz(client->lastName, cleanName, 32);
+	}
+}
+
+
+
+/////////////////////////////////////////////////////////////////////
+// EV_ClientConnect
+/////////////////////////////////////////////////////////////////////
+void EV_ClientConnect(int cnum)
+{
+	if (mod_1v1arena->integer) {
+        client_t* client;
+        client = cnum + svs.clients;
+		client->arena = 99;
+		client->playernum = cnum;
+		client->clientgamenum = cnum;
+		client->arenaKills = 0;
+		client->arenaDeaths = 0;
+	}
+
+    if (mod_1v1arena->integer) {
+        fileHandle_t   file;
+        char           buffer[MAX_STRING_CHARS];
+        client_t* client;
+        client = cnum + svs.clients;
+
+        client->clientgamenum = cnum;
+		client->weaponGiven = qfalse;
+
+        char *qpath;
+        char* guid = Info_ValueForKey(client->userinfo, "cl_guid");
+        int            len;
+
+        if (!guid){ // return if theres no guid to use.
+            return;
+        }
+        // open the data file
+        qpath = va("1v1arena/%s.txt", guid);
+        FS_FOpenFileByMode(qpath, &file, FS_READ);
+
+        // if not valid
+        if (!file) {
+			// The clients first connection, set the defaults
+			client->skill = 1000;
+			client->preference = ARENA_PRIMARY;
+			client->primary = ARENA_LR300;
+			client->secondary = ARENA_UMP45;
+			client->pistol = ARENA_DEAGLE;
+			client->sniper = ARENA_SR8;
+			Cmd_ExecuteString(va("say \"^5[Arena MOD] ^7initialized for %s \"",client->name));
+            return;
+        }
+
+        // read the file in the buffer
+		memset(buffer, 0, sizeof(buffer));
+        len = FS_Read(buffer, sizeof(buffer), file);
+        if (len > 0) {
+            // copy back the data
+            sscanf(buffer, "%i,%i,%i,%i,%i,%i", &client->skill, &client->preference, &client->primary, &client->secondary, &client->pistol, &client->sniper);
+        }
+
+        // close the file handle
+        FS_FCloseFile(file);
+        Cmd_ExecuteString(va("say \"^5[Arena MOD] ^7initialized for %s \"",client->name));
+    }
+}
+
+/////////////////////////////////////////////////////////////////////
+// EV_ClientDisconnect
+/////////////////////////////////////////////////////////////////////
+void EV_ClientDisconnect(int cnum)
+{
+    // Make sure the client is valid
+    if(cnum < 0 || cnum > sv_maxclients->integer)
+        return;
+
+    if (mod_1v1arena->integer) {
+        fileHandle_t   file;
+        char           buffer[MAX_STRING_CHARS];
+        client_t* client;
+        client = cnum + svs.clients;
+        char *qpath;
+        char* guid = Info_ValueForKey(client->userinfo, "cl_guid");
+
+        if (!guid){ // return if theres no guid to use.
+            return;
+        }
+
+        // open the file
+        qpath = va("1v1arena/%s.txt", guid);
+        FS_FOpenFileByMode(qpath, &file, FS_WRITE);
+
+        // if not valid
+        if (!file) {
+            return;
+        }
+
+        // compute the text to be stored in the .txt file
+		memset(buffer, 0, sizeof(buffer));
+
+        Com_sprintf(buffer, sizeof(buffer), "%i,%i,%i,%i,%i,%i", client->skill, client->preference, client->primary, client->secondary, client->pistol, client->sniper);
+
+        // Write the data
+        FS_Write(buffer, strlen(buffer), file);
+        FS_FCloseFile(file);
+    }
+
+	if (mod_jumpSpecAnnouncer->integer) {
+        client_t* client;
+        client = cnum + svs.clients;
+		removeFromClientsList(client);
+	}
+
+	if (mod_jumpSpecAnnouncer->integer) {
+        client_t* client;
+        client = cnum + svs.clients;
+		removeFromClientsList(client);
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// EV_ClientBegin
+/////////////////////////////////////////////////////////////////////
+void EV_ClientBegin(int cnum)
+{
+	if (mod_jumpSpecAnnouncer->integer) {
+
+		// Save the client cid
+        client_t* 	client;
+        client = cnum + svs.clients;
+		client->cid = cnum;
+
+		// clean playername
+    	char cleanName[64];
+        Q_strncpyz(cleanName, client->name, sizeof(cleanName));
+        Q_CleanStr(cleanName );
+
+		// Set it to 0 just in case
+		memset(client->nameConfigString,0,sizeof(client->nameConfigString));
+
+		// Save a config string for easy name editing
+		char* mystring = Q_CleanStr(sv.configstrings[cnum + 544]);
+		char* toreplace = va("%s", cleanName);
+		char* replacewith = "XXXXXXXXXXXXX"; // This is what we're replacing in the future
+		char* somestring = string_replace(mystring, toreplace, replacewith);
+		char mynewstring[256];
+		Q_strncpyz(mynewstring, somestring, sizeof(mynewstring));
+		Q_strncpyz(client->nameConfigString, mynewstring, sizeof(client->nameConfigString));
+	}
 }
 
 //==============================================
@@ -334,6 +1548,10 @@ intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		Cvar_Update( VMA(1) );
 		return 0;
 	case G_CVAR_SET:
+	    // let's exclude some game module cvars
+        if (!Q_stricmp((char *)VMA(1), "sv_fps")) {
+            return 0;
+        }
 		Cvar_Set( (const char *)VMA(1), (const char *)VMA(2) );
 		return 0;
 	case G_CVAR_VARIABLE_INTEGER_VALUE:
@@ -396,6 +1614,12 @@ intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		return SV_EntityContact( VMA(1), VMA(2), VMA(3), /*int capsule*/ qtrue );
 	case G_TRACE:
 		SV_Trace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], /*int capsule*/ qfalse );
+		if (((trace_t*)(VMA(1)))->entityNum > sv_maxclients->integer && mod_nofallDamage->integer) {
+			((trace_t*)(VMA(1)))->surfaceFlags |= SURF_NODAMAGE;
+		}
+		if (((trace_t*)(VMA(1)))->entityNum > sv_maxclients->integer && mod_slickSurfaces->integer) {
+			((trace_t*)(VMA(1)))->surfaceFlags |= SURF_SLICK;
+		}
 		return 0;
 	case G_TRACECAPSULE:
 		SV_Trace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], /*int capsule*/ qtrue );
@@ -918,6 +2142,141 @@ void SV_ShutdownGameProgs( void ) {
 
 /*
 ==================
+SV_EntityFile_Path
+
+TODO: handle string tokens for gametypes, server ports etc?
+TODO/FIXME: fix any possible incorrect pathing in cvar values
+==================
+*/
+const char *SV_EntityFile_Path( const char *in, const char *mapname ) {
+	char fname[MAX_QPATH];
+
+	Com_sprintf(fname, sizeof(fname), "maps/%s%s%s.ent", in, in[0] ? "/" : "", mapname);
+	return va( "%s", fname );
+}
+
+/*
+* Find the first occurrence of find in s.
+*/
+const char *Qrr_stristr( const char *s, const char *find)
+{
+  char c, sc;
+  size_t len;
+
+  if ((c = *find++) != 0)
+  {
+    if (c >= 'a' && c <= 'z')
+    {
+      c -= ('a' - 'A');
+    }
+    len = strlen(find);
+    do
+    {
+      do
+      {
+        if ((sc = *s++) == 0)
+          return NULL;
+        if (sc >= 'a' && sc <= 'z')
+        {
+          sc -= ('a' - 'A');
+        }
+      } while (sc != c);
+    } while (Q_stricmpn(s, find, len) != 0);
+    s--;
+  }
+  return s;
+}
+
+
+/*
+==================
+SV_EntityFile_Read
+
+==================
+*/
+static qboolean SV_EntityFile_Read( void ) {
+	const char	*fname;
+	qboolean	entor = qfalse;
+	union {
+		char	*c;
+		void	*v;
+	} f;
+	long		len;
+	char		*text;
+
+	if ( !sv_ent_load->integer ) return qfalse;
+
+	// load ent file if it exists
+	fname = SV_EntityFile_Path( sv_ent_load_path->string, sv_mapname->string );
+	if ( !FS_FileExists( fname ) ) return qfalse;
+
+	len = FS_ReadFile( fname, &f.v );
+	if ( f.c ) {
+		text = f.c;
+
+		if ( !Qrr_stristr( text, "{" ) || !Qrr_stristr( text, "}" ) ) {
+			Com_Printf( "Entity file with missing brace, discarded: " S_COL_VAL "%s\n", fname );
+			FS_FreeFile( f.v );
+			return qfalse;
+		}
+
+		// start the entity parsing at the beginning
+		CMod_OverrideEntityString( text, len );
+		sv.entityParsePoint = CM_EntityString();
+		Com_Printf( S_COL_BASE "Entities loaded from " S_COL_VAL "%s" S_COL_BASE ".\n", fname );
+
+		entor = qtrue;
+	} else {
+		Com_Printf( "Empty entity file: " S_COL_VAL "%s\n", fname );
+	}
+	FS_FreeFile( f.v );
+
+	return entor;
+}
+
+
+/*
+==================
+SV_EntityFile_Write
+
+==================
+*/
+static void SV_EntityFile_Write(const qboolean entor) {
+	fileHandle_t	fw;
+	const char		*fname;
+
+	// start the entity parsing at the beginning
+	sv.entityParsePoint = CM_EntityString();
+
+	// dump ent file if dumping is enabled and there's no override loaded
+	if (entor || !sv_ent_dump->integer) return;
+
+	fname = SV_EntityFile_Path(sv_ent_dump_path->string, sv_mapname->string);
+
+	if ( FS_FileExists( fname ) ) return;
+
+	fw = FS_FOpenFileWrite( fname );
+
+	if ( fw ) {
+		FS_Write( sv.entityParsePoint, strlen(sv.entityParsePoint), fw );
+		Com_Printf( S_COL_BASE "Exported entities to file: " S_COL_VAL "%s" S_COL_BASE ".\n", fname );
+		FS_FCloseFile( fw );
+	}
+}
+
+
+/*
+==================
+SV_InitEntities
+
+==================
+*/
+static void SV_InitEntities( void ) {
+	SV_EntityFile_Write( SV_EntityFile_Read() );
+}
+
+/*
+==================
 SV_InitGameVM
 
 Called for both a full init and a restart
@@ -927,7 +2286,8 @@ static void SV_InitGameVM( qboolean restart ) {
 	int		i;
 
 	// start the entity parsing at the beginning
-	sv.entityParsePoint = CM_EntityString();
+	SV_InitEntities();
+	// sv.entityParsePoint = CM_EntityString();
 
 	// clear all gentity pointers that might still be set from
 	// a previous level
@@ -937,9 +2297,44 @@ static void SV_InitGameVM( qboolean restart ) {
 		svs.clients[i].gentity = NULL;
 	}
 	
+	// For entity tracking
+	sv.lastEntityNum = 1010;
+	sv.lastIndexNum = 255;
+
 	// use the current msec count for a random seed
 	// init for this gamestate
 	VM_Call (gvm, GAME_INIT, sv.time, Com_Milliseconds(), restart);
+
+	urtVersion vurt = getVersion();
+	Com_Printf("Loading WeaponStrings... %s ", versionString[vurt]);
+	switch(vurt)
+	{
+	default:
+        break;
+	case vunk:
+		Com_Printf("[FAIL]\n **The actual version (%s) is not supported**\n", Cvar_VariableString("g_modversion"));
+		break;
+	case v42023:
+		weaponString = weaponstring42;
+		Com_Printf("[OK]\n");
+		break;
+	case v43:
+	case v431:
+	case v432:
+	case v433:
+	case v434:
+		weaponString = weaponstring43;
+		Com_Printf("[OK]\n");
+		break;
+	}
+
+	if(!overrideQVMData())
+	{
+		Com_Printf("********************************\n");
+		Com_Printf("Unable to override weapon data\n");
+		Com_Printf("********************************\n");
+	}
+
 }
 
 
@@ -980,6 +2375,7 @@ void SV_InitGameProgs( void ) {
 	extern int	bot_enable;
 	int i;
 
+
 	var = Cvar_Get( "bot_enable", "1", CVAR_LATCH );
 	if ( var ) {
 		bot_enable = var->integer;
@@ -1005,6 +2401,7 @@ void SV_InitGameProgs( void ) {
 	}
 
 	SV_InitGameVM( qfalse );
+
 }
 
 
@@ -1022,6 +2419,7 @@ qboolean SV_GameCommand( void ) {
 
 	return VM_Call( gvm, GAME_CONSOLE_COMMAND );
 }
+
 
 /*
 ====================

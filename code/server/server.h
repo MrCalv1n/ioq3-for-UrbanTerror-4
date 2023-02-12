@@ -34,6 +34,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define	MAX_ENT_CLUSTERS	16
 
+
+#define	MAX_1V1_ARENAS  12
+
+typedef struct{
+    vec3_t spawn1;
+    vec3_t spawn2;
+	int player1num;
+	int player2num;
+    int population;
+	qboolean finished;
+} arena;
+
+
 typedef struct svEntity_s {
 	struct worldSector_s *worldSector;
 	struct svEntity_s *nextEntityInWorldSector;
@@ -80,10 +93,28 @@ typedef struct {
 
 	int				restartTime;
 	int				time;
+
+	// For the anti ghost
+	unsigned int	stopAntiBlockTime;
+	qboolean		checkGhostMode;
+
+	// For the turnpike blocker
+	int				currplayers;
+
+	// For custom entities
+	int				lastEntityNum;
+	int				lastIndexNum;
+
+	// for the arenas
+	arena 			Arenas[MAX_1V1_ARENAS];
+	vec3_t 			defaultSpawns[20];
+	int				doTeleportTime;
+	int				doSmite;
+	qboolean		doneTp;
+	qboolean		doneSmite;
+	int 			finishedArenas;
+
 } server_t;
-
-
-
 
 
 typedef struct {
@@ -113,6 +144,42 @@ typedef struct netchan_buffer_s {
 	byte            msgBuffer[MAX_MSGLEN];
 	struct netchan_buffer_s *next;
 } netchan_buffer_t;
+
+
+typedef struct clientMod_s {
+	int powerups[MAX_POWERUPS];       // For infinite ammo
+	int lastEventSequence;            // For infinite ammo
+
+	int delayedSound;                 // Snapshot where sound event should be sended
+
+	int locationLocked;				  // If 1 the location command will be locked
+
+	int perPlayerHealth;			  // This player have custom config for health
+	int limitHealth;				  // Up to what health
+	int whenmovingHealth;			  // Health when a player is moving?
+	int timeoutHealth;				  // Health every X milliseconds
+	int stepHealth;					  // How many health will be added
+	int lastAutoHealth;				  // Last time autohealth this player
+	int turnOffWhenFinish;			  // Turn off the autohealth if limit < health and turnOffUsed is 1
+	int turnOffUsed;
+
+	int frozen;                       // Whether the player is frozen
+
+	vec3_t savedPosition;             // Saved client last position coordinates
+	vec3_t savedPositionAngle;        // Saved client last position angle
+
+	qboolean ghost;                   // Whether the player has cg_ghost 1 (Jump Mode)
+	qboolean ready;                   // Whether the player has activated his timer with /ready (Jump Mode)
+	qboolean noFreeSave;              // Whether the player wants to disable the free-saving feature (Jump Mode)
+
+	int infiniteStamina;              // Enable infinite stamina on a player
+	int infiniteWallJumps;            // Enable infinite walljumps on a player
+	int hidePlayers;                  // Make all other players invisible for a client
+
+	int lastWeaponAfterScope;         // For disable scope is necesary save last weapon used for do switch.
+
+	char authcl[32];                  // Change for custom auths.
+} clientMod_t;
 
 typedef struct client_s {
 	clientState_t	state;
@@ -177,15 +244,85 @@ typedef struct client_s {
 	int		demo_deltas;	// how many delta frames did we let through so far?
 	
 	int				oldServerTime;
-	qboolean			csUpdated[MAX_CONFIGSTRINGS+1];	
+	qboolean		csUpdated[MAX_CONFIGSTRINGS+1];	
 	int             numcmds;    // number of client commands so far (in this time period), for sv_floodprotect
+        
+    char            colourName[MAX_NAME_LENGTH];
+
+	// Medkit vars for gunsmod
+	qboolean 	hasmedkit;
+	int 		lastmedkittime;
+
+	// Stuff used for custom chat
+	qboolean 	muted;
+	qboolean 	isuser;
+	qboolean 	isadmin;
+	qboolean 	isowner;
+	qboolean 	isauthed;
+	qboolean 	isbot;
+	int 		chatcolour;
 
 	// for anticamp
 	float		xlast;
 	float		ylast;
 	float		zlast;
-	int		timechecked;
-	int		campcounter;
+	int			timechecked;
+	int			campcounter;
+
+	// I'll clean this up eventually lol
+	int 		lastmedtime;
+	int 		lastsoundtime;
+	qboolean 	particlefx;
+
+	// Attaching to other players
+	qboolean	hasattached;
+	qboolean 	isattached;
+	int		 	attachedto;
+	int		 	stopattach;
+
+	// for the levelsystem (parts of this may also be used by the 1v1 server)
+	int 		experience;
+	int 		level;
+	int 		kills;
+	int 		clientgamenum;
+	qboolean 	customname;
+	char 		lastcustomname[128];
+	char 		defaultconfigstr[256];
+
+	// For the spectator feature
+	int			cidCurrSpecd;
+	int			cidLastSpecd;
+	char		spectators[256];
+	int			cid;
+	int			lastLocationTime;
+	char		*location;
+	char		nameConfigString[256];
+	char		lastName[MAX_NAME_LENGTH];
+
+	// For battleroyale
+	char		*lastPistol;
+	char		*lastSecondary;
+	char		*lastRifle;
+	char		*lastSniper;
+
+	// 1v1 arena
+	int			arena;
+	int			skill;
+	int			playernum;
+	int			primary;
+	int			secondary;
+	int			pistol;
+	int			sniper;
+	int			preference;
+	qboolean	didplay;
+	qboolean	weaponGiven;
+	qboolean	didWin;
+	qboolean	didLose;
+	int			arenaKills;
+	int			arenaDeaths;
+
+    // Variables of TitanMod
+    clientMod_t cm;
 } client_t;
 
 //=============================================================================
@@ -239,6 +376,7 @@ typedef struct {
 	netadr_t	redirectAddress;			// for rcon return messages
 
 	netadr_t	authorizeAddress;			// for rcon return messages
+
 } serverStatic_t;
 
 
@@ -308,40 +446,171 @@ extern	cvar_t	*sv_lanForceRate;
 extern	cvar_t	*sv_strictAuth;
 extern	cvar_t	*sv_clientsPerIp;
 
-extern	cvar_t	*sv_demonotice;
-
+extern  cvar_t  *sv_demonotice;
 extern  cvar_t  *sv_sayprefix;
 extern  cvar_t  *sv_tellprefix;
 extern  cvar_t  *sv_demofolder;
-extern cvar_t   *mod_punishCampers;
+
+extern  cvar_t  *mod_infiniteStamina;
+extern  cvar_t  *mod_infiniteWallJumps;
+extern  cvar_t  *mod_nofallDamage;
+
+extern  cvar_t  *mod_colourNames;
+
+extern  cvar_t  *mod_playerCount;
+extern  cvar_t  *mod_botsCount;
+extern  cvar_t  *mod_mapName;
+extern  cvar_t  *mod_mapColour;
+extern  cvar_t  *mod_hideCmds;
+extern  cvar_t  *mod_infiniteAmmo;
+extern  cvar_t  *mod_forceGear;
+extern  cvar_t  *mod_checkClientGuid;
+extern  cvar_t  *mod_disconnectMsg;
+extern  cvar_t  *mod_badRconMessage;
+
+extern  cvar_t  *mod_allowTell;
+extern  cvar_t  *mod_allowRadio;
+extern  cvar_t  *mod_allowWeapDrop;
+extern  cvar_t  *mod_allowItemDrop;
+extern  cvar_t  *mod_allowFlagDrop;
+extern  cvar_t  *mod_allowSuicide;
+extern  cvar_t  *mod_allowVote;
+extern  cvar_t  *mod_allowTeamSelection;
+extern  cvar_t  *mod_allowWeapLink;
+
+extern  cvar_t  *mod_minKillHealth;
+extern  cvar_t  *mod_minTeamChangeHealth;
+
+extern  cvar_t  *mod_limitHealth;
+extern  cvar_t  *mod_timeoutHealth;
+extern  cvar_t  *mod_enableHealth;
+extern  cvar_t  *mod_addAmountOfHealth;
+extern  cvar_t  *mod_whenMoveHealth;
+
+extern  cvar_t  *mod_allowPosSaving;
+extern  cvar_t  *mod_persistentPositions;
+extern  cvar_t  *mod_freeSaving;
+extern  cvar_t  *mod_enableJumpCmds;
+extern  cvar_t  *mod_enableHelpCmd;
+extern  cvar_t  *mod_loadSpeedCmd;
+extern  cvar_t  *mod_ghostRadius;
+
+extern  cvar_t  *mod_slickSurfaces;
+extern  cvar_t  *mod_gameType;
+extern  cvar_t  *mod_ghostPlayers;
+extern  cvar_t  *mod_noWeaponRecoil;
+extern  cvar_t  *mod_noWeaponCycle;
+extern  cvar_t  *mod_specChatGlobal;
+extern  cvar_t  *mod_cleanMapPrefixes;
+
+extern  cvar_t  *mod_disableScope;
+extern  cvar_t  *mod_fastTeamChange;
+
+extern  cvar_t  *mod_auth;
+extern  cvar_t  *mod_defaultauth;
+
+extern  cvar_t  *mod_hideServer;
+extern  cvar_t  *mod_enableWeaponsCvars;
+
+extern 	cvar_t 	*mod_gunsmod;
+extern 	cvar_t 	*mod_customchat;
+extern 	cvar_t 	*mod_infiniteAirjumps;
+extern 	cvar_t  *mod_punishCampers;
+
+extern 	cvar_t 	*sv_TurnpikeBlocker;
+extern 	cvar_t 	*sv_ghostOnRoundstart;
+
+extern 	cvar_t 	*mod_announceNoscopes;
+
+extern	cvar_t *sv_ent_dump;
+extern	cvar_t *sv_ent_dump_path;
+extern	cvar_t *sv_ent_load;
+extern	cvar_t *sv_ent_load_path;
+
+extern 	cvar_t 	*mod_jumpSpecAnnouncer;
+
+extern	cvar_t 	*mod_turnpikeTeleporter;
+
+extern	cvar_t 	*mod_battleroyale;
+
+extern	cvar_t	*mod_1v1arena;
+
+extern 	cvar_t 	*mod_fastSr8;
+
+extern  cvar_t  *mod_zombiemod;
 
 #ifdef USE_AUTH
-extern	cvar_t	*sv_authServerIP;
+extern  cvar_t  *sv_authServerIP;
 extern  cvar_t  *sv_auth_engine;
 #endif
 
 //===========================================================
 
+
+//
+// qvm_offsets.c
+//
+void *QVM_baseWeapon(weapon_t weapon);
+void *QVM_bullets(weapon_t weapon);
+void *QVM_clips(weapon_t weapon);
+void *QVM_damages(weapon_t weapon , ariesHitLocation_t location);
+void *QVM_bleed(weapon_t weapon,  ariesHitLocation_t location);
+void *QVM_knockback(weapon_t weapon);
+void *QVM_reloadSpeed(weapon_t weapon);
+void *QVM_fireTime(weapon_t weapon, int mode);
+void *QVM_noRecoil(weapon_t weapon, int mode);
+void *QVM_WPflags(weapon_t weapon);
+
+
+
+//
+// sv_weapon.c
+//
+weapon_t SV_Char2Weapon(char weapon[36]);
+utItemID_t SV_Char2Item(char *item);
+int overrideQVMData(void);
+void SV_GiveBulletsAW(playerState_t *ps, int bulletsCount, int weapon);
+void SV_GiveClipsAW(playerState_t *ps, int clipsCount, int weapon);
+void SV_SetBulletsAW(playerState_t *ps, int bulletsCount, int weapon);
+void SV_SetClipsAW(playerState_t *ps, int clipsCount, int weapon);
+void SV_GiveWeaponCB(playerState_t *ps, weapon_t wp, int bullets, int clips);
+void SV_GiveWeapon(playerState_t *ps, weapon_t wp);
+void SV_RemoveWeapon(playerState_t *ps, weapon_t wp);
+void SV_WeaponMod(int cnum);
+void utPSRemoveItem ( playerState_t *ps, utItemID_t itemid );
+void utPSGiveItem ( playerState_t *ps, utItemID_t itemid );
+int utPSFirstMath (playerState_t *ps, utItemID_t itemid);
+int SV_FirstMatchFor(playerState_t *ps, weapon_t weapon);
+
+
 //
 // sv_main.c
 //
+
+void QDECL SV_LogPrintf(const char *fmt, ...);
+int SV_GetClientTeam(int cid);
+qboolean SV_IsClientGhost(client_t *cl);
+qboolean SV_IsClientInPosition(int cid, float x, float y, float z, float xPlus, float yPlus, float zPlus);
+void SV_SetClientPosition(int cid, float x, float y, float z);
+void SV_LoadPositionFromFile(client_t *cl, char *mapname);
+void SV_SavePositionToFile(client_t *cl, char *mapname);
+
 void SV_FinalMessage (char *message);
 void QDECL SV_SendServerCommand( client_t *cl, const char *fmt, ...);
 
-
 void SV_AddOperatorCommands (void);
 void SV_RemoveOperatorCommands (void);
-
 
 void SV_MasterHeartbeat (void);
 void SV_MasterShutdown (void);
 
 
 
-
 //
 // sv_init.c
 //
+
+void SV_SendCustomConfigString(client_t *client, char *cs, int index);
 void SV_SetConfigstring( int index, const char *val );
 void SV_GetConfigstring( int index, char *buffer, int bufferSize );
 void SV_UpdateConfigstrings( client_t *client );
@@ -350,13 +619,35 @@ void SV_SetUserinfo( int index, const char *val );
 void SV_GetUserinfo( int index, char *buffer, int bufferSize );
 
 void SV_ChangeMaxClients( void );
-void SV_SpawnServer( char *server, qboolean killBots );
+void SV_SpawnServer(char* server, qboolean killBots);
 
 
 
 //
 // sv_client.c
 //
+
+void MOD_ChangeLocation (client_t *cl, int changeto, int lock);
+void MOD_SendCustomLocation(client_t *cl, char *csstring, int index);
+void MOD_ResquestPk3DownloadByClientGameState( client_t *client , char *todownload);
+void addToClientsList (client_t *speccedClient, client_t *cl);
+void removeFromClientsList (client_t *client);
+//void forceLocationUpdate (client_t *speccedClient); // FIXME
+
+// events
+void EV_PlayerSpawn (int cnum);
+void EV_ClientUserInfoChanged(int cnum);
+void EV_ClientConnect(int cnum);
+void EV_ClientDisconnect(int cnum);
+void EV_ClientBegin(int cnum);
+int  SV_ClientIsMoving(client_t *cl);
+
+void MOD_PlaySoundFile (client_t *cl, char *file);
+void MOD_SetExternalEvent (client_t *cl, entity_event_t event, int eventarg);
+
+void MOD_AddHealth(client_t *cl, int value);
+void MOD_SetHealth(client_t *cl, int value);
+
 void SV_GetChallenge( netadr_t from );
 
 void SV_DirectConnect( netadr_t from );
@@ -374,15 +665,21 @@ void SV_Auth_DropClient( client_t *drop, const char *reason, const char *message
 #endif
 
 void SV_ExecuteClientCommand( client_t *cl, const char *s, qboolean clientOK );
+
+void SV_GhostThink(client_t *cl);
 void SV_ClientThink (client_t *cl, usercmd_t *cmd);
 
 void SV_WriteDownloadToClient( client_t *cl , msg_t *msg );
+
+char *SV_CleanName(char *name);
 
 //
 // sv_ccmds.c
 //
 void SV_Heartbeat_f( void );
 void SVD_WriteDemoFile(const client_t*, const msg_t*);
+
+
 
 //
 // sv_snapshot.c
@@ -396,9 +693,12 @@ void SV_SendClientSnapshot( client_t *client );
 void SV_CheckClientUserinfoTimer( void );
 void SV_UpdateUserinfo_f( client_t *cl );
 
+
+
 //
 // sv_game.c
 //
+urtVersion getVersion(void);
 int	SV_NumForGentity( sharedEntity_t *ent );
 sharedEntity_t *SV_GentityNum( int num );
 playerState_t *SV_GameClientNum( int num );
@@ -408,6 +708,8 @@ void		SV_InitGameProgs ( void );
 void		SV_ShutdownGameProgs ( void );
 void		SV_RestartGameProgs( void );
 qboolean	SV_inPVS (const vec3_t p1, const vec3_t p2);
+
+
 
 //
 // sv_bot.c
@@ -425,7 +727,8 @@ int			SV_BotGetConsoleMessage( int client, char *buf, int size );
 int BotImport_DebugPolygonCreate(int color, int numPoints, vec3_t *points);
 void BotImport_DebugPolygonDelete(int id);
 
-//============================================================
+
+
 //
 // high level object sorting to reduce interaction tests
 //
@@ -444,12 +747,9 @@ void SV_LinkEntity( sharedEntity_t *ent );
 // sets ent->leafnums[] for pvs determination even if the entity
 // is not solid
 
-
 clipHandle_t SV_ClipHandleForEntity( const sharedEntity_t *ent );
 
-
 void SV_SectorList_f( void );
-
 
 int SV_AreaEntities( const vec3_t mins, const vec3_t maxs, int *entityList, int maxcount );
 // fills in a table of entity numbers with entities that have bounding boxes
@@ -459,10 +759,8 @@ int SV_AreaEntities( const vec3_t mins, const vec3_t maxs, int *entityList, int 
 // returns the number of pointers filled in
 // The world entity is never returned in this list.
 
-
 int SV_PointContents( const vec3_t p, int passEntityNum );
 // returns the CONTENTS_* value from the world and all entities at the given point.
-
 
 void SV_Trace( trace_t *results, const vec3_t start, vec3_t mins, vec3_t maxs, const vec3_t end, int passEntityNum, int contentmask, int capsule );
 // mins and maxs are relative
@@ -475,9 +773,10 @@ void SV_Trace( trace_t *results, const vec3_t start, vec3_t mins, vec3_t maxs, c
 
 // passEntityNum is explicitly excluded from clipping checks (normally ENTITYNUM_NONE)
 
-
 void SV_ClipToEntity( trace_t *trace, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int entityNum, int contentmask, int capsule );
 // clip to a specific entity
+
+
 
 //
 // sv_net_chan.c

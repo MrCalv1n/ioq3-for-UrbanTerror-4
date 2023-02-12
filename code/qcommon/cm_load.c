@@ -107,6 +107,21 @@ void CMod_LoadShaders( lump_t *l ) {
 
 	out = cm.shaders;
 	for ( i=0 ; i<count ; i++, in++, out++ ) {
+
+		cvar_t *mod_specialWater;
+		mod_specialWater = Cvar_Get("mod_specialWater", "0", CVAR_ARCHIVE | CVAR_LATCH);
+
+		if (out->contentFlags & CONTENTS_WATER) {
+			if (mod_specialWater->integer == 1) {
+				out->contentFlags &= ~CONTENTS_WATER;
+				out->contentFlags |= CONTENTS_SOLID;
+				out->surfaceFlags |= SURF_SLICK;
+			} else if (mod_specialWater->integer == 2) {
+				out->contentFlags &= ~CONTENTS_WATER;
+				out->contentFlags |= CONTENTS_LAVA;
+			}
+		}
+
 		out->contentFlags = LittleLong( out->contentFlags );
 		out->surfaceFlags = LittleLong( out->surfaceFlags );
 	}
@@ -444,6 +459,18 @@ void CMod_LoadEntityString( lump_t *l ) {
 	cm.entityString = Hunk_Alloc( l->filelen, h_high );
 	cm.numEntityChars = l->filelen;
 	Com_Memcpy (cm.entityString, cmod_base + l->fileofs, l->filelen);
+}
+
+/*
+=================
+CMod_OverrideEntityString
+=================
+*/
+void CMod_OverrideEntityString(char *buf, const int len) {
+	//memset( cm.entityString, 0, sizeof(cm.entityString) );
+	cm.entityString = Hunk_Alloc(len, h_high);
+	cm.numEntityChars = len;
+	Com_Memcpy(cm.entityString, buf, len);
 }
 
 /*

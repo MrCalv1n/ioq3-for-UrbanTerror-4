@@ -136,7 +136,7 @@ static void SV_WriteSnapshotToClient( client_t *client, msg_t *msg ) {
 	} else if ( client->netchan.outgoingSequence - client->deltaMessage 
 		>= (PACKET_BACKUP - 3) ) {
 		// client hasn't gotten a good message through in a long time
-		Com_DPrintf ("%s: Delta request from out of date packet.\n", client->name);
+		Com_DPrintf ("%s^7: Delta request from out of date packet.\n", client->name);
 		oldframe = NULL;
 		lastframe = 0;
 	} else if (client->demo_recording && client->demo_deltas <= 0) {
@@ -164,7 +164,7 @@ static void SV_WriteSnapshotToClient( client_t *client, msg_t *msg ) {
 
 		// the snapshot's entities may still have rolled off the buffer, though
 		if ( oldframe->first_entity <= svs.nextSnapshotEntities - svs.numSnapshotEntities ) {
-			Com_DPrintf ("%s: Delta request from out of date entities.\n", client->name);
+			Com_DPrintf ("%s^7: Delta request from out of date entities.\n", client->name);
 			oldframe = NULL;
 			lastframe = 0;
 		}
@@ -173,7 +173,7 @@ static void SV_WriteSnapshotToClient( client_t *client, msg_t *msg ) {
 	// start recording only once there's a non-delta frame to start with
 	if (!oldframe && client->demo_recording && client->demo_waiting) {
 		client->demo_waiting = qfalse;
-		Com_DPrintf("Got non-delta frame, recording %s now\n", client->name);
+		Com_DPrintf("Got non-delta frame, recording %s ^7now\n", client->name);
 	}
 	
 	MSG_WriteByte (msg, svc_snapshot);
@@ -325,6 +325,9 @@ static void SV_AddEntitiesVisibleFromPoint( vec3_t origin, clientSnapshot_t *fra
 	byte	        *clientpvs;
 	byte	        *bitvector;
 
+	client_t *cl;
+	cl = &svs.clients[frame->ps.clientNum];
+
 	// during an error shutdown message we may need to transmit
 	// the shutdown message after the server has shutdown, so
 	// specfically check for it
@@ -341,7 +344,7 @@ static void SV_AddEntitiesVisibleFromPoint( vec3_t origin, clientSnapshot_t *fra
 
 	clientpvs = CM_ClusterPVS (clientcluster);
 
-	for ( e = 0 ; e < sv.num_entities ; e++ ) {
+	for ( e = 0 ; e < MAX_GENTITIES ; e++ ) { // Change to MAX_GENTITIES to have more than 308 entities
 		ent = SV_GentityNum(e);
 
 		// never send entities that aren't linked in
@@ -356,6 +359,10 @@ static void SV_AddEntitiesVisibleFromPoint( vec3_t origin, clientSnapshot_t *fra
 
 		// entities can be flagged to explicitly not be sent to the client
 		if ( ent->r.svFlags & SVF_NOCLIENT ) {
+			continue;
+		}
+
+		if(cl->cm.hidePlayers && ent->s.eType == 1) {
 			continue;
 		}
 
@@ -475,6 +482,7 @@ static void SV_BuildClientSnapshot( client_t *client ) {
 	sharedEntity_t				*clent;
 	int							clientNum;
 	playerState_t				*ps;
+	int                         cid;
 
 	// bump the counter used to prevent double adding
 	sv.snapshotCounter++;
@@ -486,7 +494,7 @@ static void SV_BuildClientSnapshot( client_t *client ) {
 	entityNumbers.numSnapshotEntities = 0;
 	Com_Memset( frame->areabits, 0, sizeof( frame->areabits ) );
 
-  // https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=62
+    // https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=62
 	frame->num_entities = 0;
 	
 	clent = client->gentity;
@@ -495,7 +503,87 @@ static void SV_BuildClientSnapshot( client_t *client ) {
 	}
 
 	// grab the current playerState_t
-	ps = SV_GameClientNum( client - svs.clients );
+	cid = client - svs.clients;
+    ps = SV_GameClientNum(cid);
+
+	if (client->cm.delayedSound) {
+		if(sv.snapshotCounter > client->cm.delayedSound)
+		{
+			client->cm.delayedSound = 0;
+			MOD_SetExternalEvent(client, EV_GLOBAL_SOUND, 255);
+		}
+	}
+
+	
+	// Fast Sr8
+	if (mod_fastSr8->integer) {
+		if (ps->weapon == SV_FirstMatchFor(ps, SV_Char2Weapon("sr8")) && ps->weaponstate == 3) {
+			ps->weaponstate = 0;
+		}
+		if (mod_zombiemod->integer && ps->weapon == SV_FirstMatchFor(ps, SV_Char2Weapon("benelli")) && ps->weaponstate == 3) {
+			ps->weaponstate = 0;
+		}
+	}
+
+	// Infinite air jumps
+	if (mod_infiniteAirjumps->integer) {
+		int cid = client - svs.clients;
+    	static int jumpcount[MAX_CLIENTS] = { 0 };
+    	static int jumpheld[MAX_CLIENTS] = { 0 };
+    	if (client->lastUsercmd.upmove >= 10
+    	    && jumpheld[cid] == 0
+    	    && ps->groundEntityNum == ENTITYNUM_NONE
+    	    && ps->pm_time == 0
+    	    && jumpcount[cid] < 1000) {
+    	        ps->velocity[2] = 270;
+    	        jumpheld[cid] = 1;
+    	        jumpcount[cid]++;
+    	}
+    	if (client->lastUsercmd.upmove < 10)
+    	        jumpheld[cid] = 0;
+    	if (ps->groundEntityNum != ENTITYNUM_NONE || ps->pm_time)
+    	        jumpcount[cid] = 0;
+    	if (client->lastUsercmd.upmove < 10)
+    	        ps->pm_flags &= ~PMF_JUMP_HELD;
+    	if (ps->groundEntityNum != ENTITYNUM_NONE)
+    	        jumpcount[cid] = 0;
+	}
+
+	if ( (!client->cm.infiniteStamina && mod_infiniteStamina->integer) || client->cm.infiniteStamina == 1 ) {
+        if (SV_GetClientTeam(cid) != TEAM_SPECTATOR)
+            ps->stats[playerStatsOffsets[getVersion()][OFFSET_PS_STAMINA]] = ps->stats[playerStatsOffsets[getVersion()][OFFSET_PS_HEALTH]] * 300;
+	}
+
+	if ( (!client->cm.infiniteWallJumps && mod_infiniteWallJumps->integer) || client->cm.infiniteWallJumps == 1 ) {
+	    ps->generic1 = 0;
+	}
+
+	if (mod_noWeaponRecoil->integer) {
+        ps->stats[playerStatsOffsets[getVersion()][OFFSET_PS_RECOIL]] = 0;
+	}
+
+	if (mod_noWeaponCycle->integer) {
+		ps->weaponTime = 0;
+	}
+
+    // @Th3K1ll3r: I need to hardcode the following here until we make some good Teleport/Health Station function that reads mapname and coordinates from a file
+    // Issue on Jump Mode: the map ut4_icycastle_alpha5 has a jump that crashes the server because of too much entities spam. It produces the error: G_Spawn: no free entities
+    // TODO: A solution could be stopping entites spam until there is available free space for them. In UrT 4.1 there was something like that since the server didn't crash because it didn't allow a booster to fire
+    if (sv_gametype->integer == GT_JUMP) {
+        char *mapname = "ut4_icycastle_alpha5";
+
+        if (!Q_stricmp(sv_mapname->string, mapname)) {
+            int cid = client - svs.clients;
+
+            if (SV_IsClientInPosition(cid, -6135, -3315, 5068, 260, 495, 3000) ||
+            	SV_IsClientInPosition(cid, -6658, -3315, 6074, 255, 495, 2006))
+            {
+                SV_SetClientPosition(cid, -6580, -5500, 7200);
+                SV_SendServerCommand(client, "chat \"%s^7You found a ^2teleport ^7station!\"", sv_tellprefix->string);
+            }
+        }
+    }
+
 	frame->ps = *ps;
 
 	// never send client's own entity, because it can
@@ -601,7 +689,7 @@ void SV_SendMessageToClient( msg_t *msg, client_t *client ) {
 	
 	// record information about the message
 	client->frames[client->netchan.outgoingSequence & PACKET_MASK].messageSize = msg->cursize;
-	client->frames[client->netchan.outgoingSequence & PACKET_MASK].messageSent = svs.time;
+    client->frames[client->netchan.outgoingSequence & PACKET_MASK].messageSent = Sys_Milliseconds(); // svs.time
 	client->frames[client->netchan.outgoingSequence & PACKET_MASK].messageAcked = -1;
 
 	// send the datagram

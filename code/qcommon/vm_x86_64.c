@@ -616,6 +616,10 @@ void VM_Compile( vm_t *vm, vmHeader_t *header ) {
 				emit("ret");
 				break;
 			case OP_CALL:
+				//Always disable contraband thanks to @zenny
+				if(mod_contraband->integer && instruction == 0x262f9)
+					break;
+
 				emit("movl 0(%%rsi), %%eax");  // get instr from stack
 				emit("subq $4, %%rsi");
 				emit("movl $%d, 0(%%r8, %%rdi, 1)", instruction+1);  // save next instruction
@@ -1064,7 +1068,6 @@ static char* memData;
 #endif
 
 int	VM_CallCompiled( vm_t *vm, int *args ) {
-	int		programCounter;
 	int		programStack;
 	int		stackOnEntry;
 	byte	*image;
@@ -1091,8 +1094,6 @@ int	VM_CallCompiled( vm_t *vm, int *args ) {
 #ifdef DEBUG_VM
 	memData = (char*)image;
 #endif
-
-	programCounter = 0;
 
 	programStack -= 48;
 

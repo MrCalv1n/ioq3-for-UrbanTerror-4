@@ -219,6 +219,46 @@ void SV_LinkEntity( sharedEntity_t *gEnt ) {
 		SV_UnlinkEntity( gEnt );	// unlink from old position
 	}
 
+	//If a weapon is trying to be linked, return it
+	if(gEnt->s.eType == ET_ITEM &&
+		gEnt->s.modelindex >= UT_ITEM_BERETTA &&
+		gEnt->s.modelindex < UT_ITEM_MAX &&
+		mod_allowWeapLink->integer==0)
+	{
+		return;
+	}
+
+	// Set the player names flag back (Ghost Fix - Jump Mode)
+	if (!mod_ghostPlayers->integer) {
+		if (gEnt->s.number < sv_maxclients->integer) {
+			client_t	*cl;
+			gentity_t   *cent;
+			cl = &svs.clients[gEnt->s.number];
+			if (cl->state == CS_ACTIVE) {
+				cent = (gentity_t *)SV_GentityNum(cl - svs.clients);
+				if (cent->health <= 0) {
+					return;
+				}
+			}
+		}
+
+		if (!(gEnt->r.contents & CONTENTS_BODY)) {
+			if (gEnt->s.number >= 0 && gEnt->s.number < sv_maxclients->integer) {
+				gEnt->r.contents |= CONTENTS_BODY;
+				gEnt->r.contents &= ~CONTENTS_CORPSE;
+			}
+		}
+	}
+
+	if (mod_ghostPlayers->integer) {
+		if (gEnt->r.contents & CONTENTS_BODY) {
+			if (gEnt->s.number >= 0 && gEnt->s.number < sv_maxclients->integer) {
+				gEnt->r.contents &= ~CONTENTS_BODY;
+				gEnt->r.contents |= CONTENTS_CORPSE;
+			}
+		}
+	}
+
 	// encode the size into the entityState_t for client prediction
 	if ( gEnt->r.bmodel ) {
 		gEnt->s.solid = SOLID_BMODEL;		// a solid_box will never create this value

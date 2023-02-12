@@ -1,0 +1,98 @@
+playsoundfile 0 /zsounds/def
+playsoundfile 0 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 1 /zsounds/def
+playsoundfile 1 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 2 /zsounds/def
+playsoundfile 2 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 3 /zsounds/def
+playsoundfile 3 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 4 /zsounds/def
+playsoundfile 4 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 5 /zsounds/def
+playsoundfile 5 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 6 /zsounds/def
+playsoundfile 6 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 7 /zsounds/def
+playsoundfile 7 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 8 /zsounds/def
+playsoundfile 8 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 9 /zsounds/def
+playsoundfile 9 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 10 /zsounds/def
+playsoundfile 10 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 11 /zsounds/def
+playsoundfile 11 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 12 /zsounds/def
+playsoundfile 12 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 13 /zsounds/def
+playsoundfile 13 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 14 /zsounds/def
+playsoundfile 14 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 15 /zsounds/def
+playsoundfile 15 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 16 /zsounds/def
+playsoundfile 16 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 17 /zsounds/def
+playsoundfile 17 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 19 /zsounds/def
+playsoundfile 18 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 19 /zsounds/def
+playsoundfile 19 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 20 /zsounds/def
+playsoundfile 20 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 21 /zsounds/def
+playsoundfile 21 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 22 /zsounds/def
+playsoundfile 22 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 23 /zsounds/def
+playsoundfile 23 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 24 /zsounds/def
+playsoundfile 24 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 25 /zsounds/def
+playsoundfile 25 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 26 /zsounds/def
+playsoundfile 26 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 27 /zsounds/def
+playsoundfile 27 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 28 /zsounds/def
+playsoundfile 28 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 29 /zsounds/def
+playsoundfile 29 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 30 /zsounds/def
+playsoundfile 30 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 31 /zsounds/def
+playsoundfile 31 /zsounds/wickedsick.wav
+wait 1
+playsoundfile 32 /zsounds/def
+playsoundfile 32 /zsounds/wickedsick.wav

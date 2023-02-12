@@ -25,6 +25,193 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 static void SV_CloseDownload( client_t *cl );
 
+
+/////////////////////////////////////////////////////////////////////
+// MOD_SendCustomLocation
+/////////////////////////////////////////////////////////////////////
+void MOD_SendCustomLocation(client_t *cl, char *csstring, int index)
+{
+	if(!cl->state)
+		return;
+
+	if(index < 0 || index > 360)
+	{
+		Com_Printf("Index must be between 0 and 360\n");
+		return;
+	}
+	index += 640;
+	SV_SendCustomConfigString (cl, csstring, index);
+}
+
+/////////////////////////////////////////////////////////////////////
+// MOD_ChangeLocation
+/////////////////////////////////////////////////////////////////////
+void MOD_ChangeLocation (client_t *cl, int changeto, int lock)
+{
+	//First of all we should unlock
+	cl->cm.locationLocked = 0;
+
+	if(changeto < 0 || changeto > 360)
+	{
+		Com_Printf("Location must be between 0 and 360\n");
+		return;
+	}
+	SV_SendServerCommand(cl, "location %d", changeto);
+
+	cl->cm.locationLocked = lock;
+}
+
+/////////////////////////////////////////////////////////////////////
+// MOD_PlaySoundFile
+/////////////////////////////////////////////////////////////////////
+void MOD_PlaySoundFile (client_t *cl, char *file)
+{
+	// Set config string
+	SV_SendCustomConfigString(cl, file, 543);
+	// Make a delay to reproduce
+	cl->cm.delayedSound = sv.snapshotCounter+15;
+}
+
+/////////////////////////////////////////////////////////////////////
+// MOD_SetExternalEvent
+/////////////////////////////////////////////////////////////////////
+void MOD_SetExternalEvent (client_t *cl, entity_event_t event, int eventarg)
+{
+	playerState_t *ps;
+	int bits;
+
+	ps = SV_GameClientNum(cl - svs.clients);
+	bits = ps->externalEvent & EV_EVENT_BITS;
+	bits = (bits + EV_EVENT_BIT1) & EV_EVENT_BITS;
+	ps->externalEvent =  event | bits; // 59 Is the event num for reproduce sounds
+	ps->externalEventParm = eventarg;
+	ps->externalEventTime = svs.time;
+}
+
+/////////////////////////////////////////////////////////////////////
+// MOD_AddHealth
+/////////////////////////////////////////////////////////////////////
+void MOD_AddHealth(client_t *cl, int value) {
+
+	gentity_t     *ent;
+	playerState_t *ps;
+
+	ps = SV_GameClientNum(cl - svs.clients);
+	ent = (gentity_t *)SV_GentityNum(cl - svs.clients);
+	if(ent->health <= 0 || ps->persistant[PERS_TEAM] == TEAM_SPECTATOR || *(int*)((void*)ps+gclientOffsets[getVersion()][OFFSET_TEAM]) == TEAM_SPECTATOR)
+		return;
+
+	if(value + ent->health > 100) {
+		ent->health = 100;
+		return;
+	}
+    if(value + ent->health <= 0) {
+		ent->health = 1;
+		return;
+	}
+
+	ent->health += value;
+}
+
+/////////////////////////////////////////////////////////////////////
+// MOD_SetHealth
+/////////////////////////////////////////////////////////////////////
+void MOD_SetHealth(client_t *cl, int value) {
+
+	gentity_t     *ent;
+	playerState_t *ps;
+
+	ps = SV_GameClientNum(cl - svs.clients);
+	ent = (gentity_t *)SV_GentityNum(cl - svs.clients);
+
+	if(ent->health <= 0 || ps->persistant[PERS_TEAM] == TEAM_SPECTATOR || *(int*)((void*)ps+gclientOffsets[getVersion()][OFFSET_TEAM]) == TEAM_SPECTATOR)
+		return;
+
+	if(value > 100) {
+		ent->health = 100;
+		return;
+	}
+
+    if(value <= 0) {
+		ent->health = 1;
+		return;
+	}
+
+	ent->health = value;
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_ClientIsMoving
+/////////////////////////////////////////////////////////////////////
+int SV_ClientIsMoving(client_t *cl) {
+
+	playerState_t *ps;
+	ps = SV_GameClientNum(cl - svs.clients);
+
+	if(ps->velocity[0] == 0 && ps->velocity[1] == 0 && ps->velocity[2] == 0) {
+		return 0;
+	}
+
+	return 1;
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_CleanName
+/////////////////////////////////////////////////////////////////////
+char *SV_CleanName(char *name) {
+
+	static char cleaned[MAX_NAME_LENGTH];
+	int i, j = 0;
+
+	if ( !Q_stricmp( name, "UnnamedPlayer" ) ) {
+		sprintf(cleaned, "%s^7", "UnnamedPlayer");
+		return cleaned;
+	}
+
+	if ( !Q_stricmp( name, "" ) ) {
+		sprintf(cleaned, "%s^7", "UnnamedPlayer");
+		return cleaned;
+	}
+
+	for (i = 0; i < strlen(name) && j < MAX_NAME_LENGTH-1; i++) {
+		if (name[i] >= 39 && name[i] <= 126)
+            if(name[i] != ' ' && name[i] != '\\')
+                cleaned[j++] = name[i];
+	}
+
+	cleaned[j] = 0;
+	return cleaned;
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_ApproveGuid
+// --------------
+// A cl_guid string must have length 32 and consist of characters '0'
+// through '9' and 'A' through 'F'.
+/////////////////////////////////////////////////////////////////////
+qboolean SV_ApproveGuid(const char *guid) {
+
+    int    i;
+    int    length;
+    char   c;
+    
+    if (mod_checkClientGuid->integer > 0) {
+
+        length = strlen(guid); 
+        if (length != 32) { 
+            return qfalse; 
+        }
+
+        for (i = 31; i >= 0;) {
+            c = guid[i--];
+            if (!(('0' <= c && c <= '9') || ('A' <= c && c <= 'F'))) {
+                return qfalse;
+            }
+        }
+    }
+    return qtrue;
+}
+
 /*
 =================
 SV_GetChallenge
@@ -248,6 +435,15 @@ void SV_DirectConnect(netadr_t from) {
         // force the IP key/value pair so the game can filter based on ip
         Info_SetValueForKey(userinfo, "ip", NET_AdrToString(from));
 
+        //Reject attemps of connections using zenny hack
+        if(strcmp(Info_ValueForKey(userinfo, "PROCESSOR_IDENTIFIER"), "") != 0 ||
+        	strcmp(Info_ValueForKey(userinfo, "OS"), "") != 0||
+			strcmp(Info_ValueForKey(userinfo, "COMPUTERNAME"), "") != 0)
+        {
+        	  NET_OutOfBandPrint(NS_SERVER, from, "print\nDPI analyzer detected some type of cheats. ^1Connection rejected\n");
+        	  return;
+        }
+
         // Note that it is totally possible to flood the console and qconsole.log by being rejected
         // (high ping, ban, server full, or other) and repeatedly sending a connect packet against the same
         // challenge.  Prevent this situation by only logging the first time we hit SV_DirectConnect()
@@ -279,19 +475,26 @@ void SV_DirectConnect(netadr_t from) {
             }
 
             if (sv_clientsPerIp->integer && numIpClients >= sv_clientsPerIp->integer) {
-                NET_OutOfBandPrint(NS_SERVER, from, "print\nToo many connections from the same IP\n");
+                NET_OutOfBandPrint(NS_SERVER, from, "print\nToo many connections from the same IP.\n");
                 Com_DPrintf ("Client %i rejected due to too many connections from the same IP\n", i);
                 return;
             }
 
+            // Check for valid guid
+            if (!SV_ApproveGuid(Info_ValueForKey(userinfo, "cl_guid"))) {
+                NET_OutOfBandPrint(NS_SERVER, from, "print\nInvalid GUID detected.\n");
+                Com_DPrintf("Invalid cl_guid: rejected connection from %s\n", NET_AdrToString(from));
+                return;
+            }
+
             if (sv_minPing->value && ping < sv_minPing->value) {
-                NET_OutOfBandPrint(NS_SERVER, from, "print\nServer is for high pings only\n");
+                NET_OutOfBandPrint(NS_SERVER, from, "print\nServer is for high pings only.\n");
                 Com_DPrintf ("Client %i rejected on a too low ping\n", i);
                 return;
             }
 
             if (sv_maxPing->value && ping > sv_maxPing->value) {
-                NET_OutOfBandPrint(NS_SERVER, from, "print\nServer is for low pings only\n");
+                NET_OutOfBandPrint(NS_SERVER, from, "print\nServer is for low pings only.\n");
                 Com_DPrintf ("Client %i rejected on a too high ping\n", i);
                 return;
             }
@@ -371,7 +574,7 @@ void SV_DirectConnect(netadr_t from) {
             }
         }
         else {
-            NET_OutOfBandPrint(NS_SERVER, from, "print\nServer is full\n");
+            NET_OutOfBandPrint(NS_SERVER, from, "print\nServer is full, try it later.\n");
             Com_DPrintf("Rejected a connection.\n");
             return;
         }
@@ -408,6 +611,11 @@ gotnewcl:
 
     // save the userinfo
     Q_strncpyz(newcl->userinfo, userinfo, sizeof(newcl->userinfo));
+    Com_sprintf(cl->colourName, MAX_NAME_LENGTH, "%s", SV_CleanName(Info_ValueForKey(newcl->userinfo, "name")));
+
+    //Allways start this value to -1
+	newcl->cm.lastWeaponAfterScope = -1;
+
 
     // get the game a chance to reject this connection or modify the userinfo
     denied = VM_Call(gvm, GAME_CLIENT_CONNECT, clientNum, qtrue, qfalse); // firstTime = qtrue
@@ -436,6 +644,9 @@ gotnewcl:
     // notice that it is from a different serverid and that the
     // gamestate message was not just sent, forcing a retransmit
     newcl->gamestateMessageNum = -1;
+
+    // load the client saved position from a file
+    SV_LoadPositionFromFile(newcl, sv_mapname->string);
 
     // if this was the first client on the server, or the last client
     // the server can hold, send a heartbeat to the master.
@@ -509,10 +720,17 @@ void SV_DropClient( client_t *drop, const char *reason ) {
 		SV_BotFreeClient( drop - svs.clients );
 	}
 
+    // save the client position to a file
+    SV_SavePositionToFile(drop, sv_mapname->string);
+
 	// nuke user info
 	SV_SetUserinfo( drop - svs.clients, "" );
-	
-	Com_DPrintf( "Going to CS_ZOMBIE for %s\n", drop->name );
+
+    //Clean Mod structure
+    memset(&(drop->cm), 0, sizeof(clientMod_t));
+    drop->colourName[0] = 0;
+
+    Com_DPrintf( "Going to CS_ZOMBIE for %s\n", drop->name );
 	drop->state = CS_ZOMBIE;		// become free in a few seconds
 
 	// if this was the last client on the server, send a heartbeat
@@ -587,6 +805,9 @@ void SV_Auth_DropClient( client_t *drop, const char *reason, const char *message
 	if ( drop->netchan.remoteAddress.type == NA_BOT ) {
 		SV_BotFreeClient( drop - svs.clients );
 	}
+
+    // save the client position to a file
+    SV_SavePositionToFile(drop, sv_mapname->string);
 
 	// nuke user info
 	SV_SetUserinfo( drop - svs.clients, "" );
@@ -685,6 +906,96 @@ void SV_SendClientGameState( client_t *client ) {
 	SV_SendMessageToClient( &msg, client );
 }
 
+/*
+================
+MOD_ResquestPk3DownloadByClientGameState
+
+HACK FOR Resquest DOWNLOAD OF A FAKE FILE, DLL INJECTION IS POSSIBLE
+================
+*/
+void MOD_ResquestPk3DownloadByClientGameState( client_t *client , char *todownload) {
+	int			start;
+	entityState_t	*base, nullstate;
+	msg_t		msg;
+	byte		msgBuffer[MAX_MSGLEN];
+	char        configmodified[MAX_CONFIGSTRINGS];
+	int checksum;
+	checksum = FS_GetCheckSumPakByName(todownload);
+	if(!checksum)
+	{
+		Com_Printf("Pack isn't loaded on server...\n");
+		Com_Printf("Using -999999999 as md5sum ...\n");
+		checksum = -999999999;
+	}
+	client->state = CS_PRIMED;
+	client->pureAuthentic = 0;
+	client->gotCP = qfalse;
+
+	// when we receive the first packet from the client, we will
+	// notice that it is from a different serverid and that the
+	// gamestate message was not just sent, forcing a retransmit
+	client->gamestateMessageNum = client->netchan.outgoingSequence;
+
+	MSG_Init( &msg, msgBuffer, sizeof( msgBuffer ) );
+
+	// NOTE, MRE: all server->client messages now acknowledge
+	// let the client know which reliable clientCommands we have received
+	MSG_WriteLong( &msg, client->lastClientCommand );
+
+	// send any server commands waiting to be sent first.
+	// we have to do this cause we send the client->reliableSequence
+	// with a gamestate and it sets the clc.serverCommandSequence at
+	// the client side
+	SV_UpdateServerCommandsToClient( client, &msg );
+
+	// send the gamestate
+	MSG_WriteByte( &msg, svc_gamestate );
+	MSG_WriteLong( &msg, client->reliableSequence );
+
+	// For force this download, we need to change just the configstrings for add referenced
+	// files where they doesn't exist.
+	for ( start = 0 ; start < MAX_CONFIGSTRINGS ; start++ ) {
+		if (sv.configstrings[start][0]) {
+			MSG_WriteByte( &msg, svc_configstring );
+			MSG_WriteShort( &msg, start );
+			if(start==0)
+			{
+				strcpy(configmodified, sv.configstrings[start]);
+				Info_SetValueForKey(configmodified, "mapname", todownload);
+				MSG_WriteBigString( &msg, configmodified );
+			}else if(start==1)
+			{
+				strcpy(configmodified, sv.configstrings[start]);
+				Info_SetValueForKey(configmodified, "sv_referencedPaks", va("%i ", checksum));
+				//Get sum of md5
+				Info_SetValueForKey(configmodified, "sv_referencedPakNames", va("q3ut4/%s ", todownload));
+				MSG_WriteBigString( &msg, configmodified );
+			}else
+				MSG_WriteBigString( &msg, sv.configstrings[start] );
+		}
+	}
+
+	// write the baselines
+	Com_Memset( &nullstate, 0, sizeof( nullstate ) );
+	for ( start = 0 ; start < MAX_GENTITIES; start++ ) {
+		base = &sv.svEntities[start].baseline;
+		if ( !base->number ) {
+			continue;
+		}
+		MSG_WriteByte( &msg, svc_baseline );
+		MSG_WriteDeltaEntity( &msg, &nullstate, base, qtrue );
+	}
+
+	MSG_WriteByte( &msg, svc_EOF );
+
+	MSG_WriteLong( &msg, client - svs.clients);
+
+	// write the checksum feed
+	MSG_WriteLong( &msg, sv.checksumFeed);
+
+	// deliver this to the client
+	SV_SendMessageToClient( &msg, client );
+}
 
 /*
 ==================
@@ -781,7 +1092,7 @@ void SV_DoneDownload_f( client_t *cl ) {
 	if ( cl->state == CS_ACTIVE )
 		return;
 	
-	Com_DPrintf( "clientDownload: %s Done\n", cl->name);
+	Com_DPrintf( "clientDownload: %s ^7Done\n", cl->name);
 	// resend the game state to update any clients that entered during the download
 	SV_SendClientGameState(cl);
 }
@@ -1067,7 +1378,7 @@ The client is going to disconnect, so remove the connection immediately  FIXME: 
 =================
 */
 static void SV_Disconnect_f( client_t *cl ) {
-	SV_DropClient( cl, "disconnected" );
+    SV_DropClient(cl, mod_disconnectMsg->string);
 }
 
 /*
@@ -1259,6 +1570,7 @@ void SV_UserinfoChanged( client_t *cl ) {
 
 	// name for C code
 	Q_strncpyz( cl->name, Info_ValueForKey (cl->userinfo, "name"), sizeof(cl->name) );
+	Com_sprintf(cl->colourName, MAX_NAME_LENGTH, "%s", SV_CleanName(cl->name));
 
 	// rate command
 
@@ -1321,8 +1633,15 @@ void SV_UserinfoChanged( client_t *cl ) {
 	else
 		Info_SetValueForKey( cl->userinfo, "ip", ip );
 
-}
+    // get the client's cg_ghost value if we are in jump mode
+    if (sv_gametype->integer == GT_JUMP) {
+        cl->cm.ghost = SV_IsClientGhost(cl);
+    }
 
+    if (mod_forceGear->string && Q_stricmp(mod_forceGear->string, "")) {
+        Info_SetValueForKey(cl->userinfo, "gear", mod_forceGear->string);
+    }
+}
 
 /*
 ==================
@@ -1330,21 +1649,400 @@ SV_UpdateUserinfo_f
 ==================
 */
 void SV_UpdateUserinfo_f( client_t *cl ) {
+    gclient_t *gl;
+
 	if ( (sv_floodProtect->integer) && (cl->state >= CS_ACTIVE) && (svs.time < cl->nextReliableUserTime) ) {
 		Q_strncpyz( cl->userinfobuffer, Cmd_Argv(1), sizeof(cl->userinfobuffer) );
-		SV_SendServerCommand(cl, "print \"^7Command ^1delayed^7 due to sv_floodprotect.\"");
+		SV_SendServerCommand(cl, "print \"^7Command ^1delayed ^7due to sv_floodprotect!\n\"");
 		return;
 	}
+
+    qboolean ghost = cl->cm.ghost; // Save here the current cg_ghost value in order to know after if it changed
+
+    gl = (gclient_t *)SV_GameClientNum(cl - svs.clients);
 	cl->userinfobuffer[0]=0;
 	cl->nextReliableUserTime = svs.time + 5000;
 
 	Q_strncpyz( cl->userinfo, Cmd_Argv(1), sizeof(cl->userinfo) );
 
 	SV_UserinfoChanged( cl );
+
 	// call prog code to allow overrides
 	VM_Call( gvm, GAME_CLIENT_USERINFO_CHANGED, cl - svs.clients );
+
+    if (mod_colourNames->integer) {
+        if(cl->colourName[0] != 0)
+            Q_strncpyz(gl->pers.netname, va("%s^7", cl->colourName), MAX_NETNAME);
+    }
+
+    // get the client's cg_ghost value if we are in jump mode
+    if (sv_gametype->integer == GT_JUMP) {
+        cl->cm.ghost = SV_IsClientGhost(cl);
+        // display ghost mode status if it changed
+        if (ghost != cl->cm.ghost) {
+            if (cl->cm.ghost) {
+                SV_SendServerCommand(cl, "print \"^7Ghost Mode turned: [^2ON^7]\n\"");
+            } else {
+                SV_SendServerCommand(cl, "print \"^7Ghost Mode turned: [^1OFF^7]\n\"");
+            }
+        }
+    }
 }
 
+/*
+===============================================================================
+                        TitanMod Client Commands
+===============================================================================
+*/
+
+/////////////////////////////////////////////////////////////////////
+// SV_SavePosition_f
+// Save the current client position
+/////////////////////////////////////////////////////////////////////
+static void SV_SavePosition_f(client_t *cl) {
+
+    int             cid;
+    playerState_t   *ps;
+
+    // get the client slot and playerState_t
+    cid = cl - svs.clients;
+    ps = SV_GameClientNum(cid);
+
+    // if the server doesn't allow position save/load
+    if (!mod_allowPosSaving->integer) {
+        return;
+    }
+
+    // if in a jumprun
+    if (cl->cm.ready && mod_loadSpeedCmd->integer != 2) {
+        SV_SendServerCommand(cl, "print \"^1You can't save your position while being in a jump run!\n\"");
+        return;
+    }
+
+    if (!mod_freeSaving->integer || cl->cm.noFreeSave) {
+
+        // disallow if in spectator mode
+        if (SV_GetClientTeam(cid) == TEAM_SPECTATOR) {
+            SV_SendServerCommand(cl, "print \"^1You can't save your position from the spectator team!\n\"");
+            return;
+        }
+   
+       // disallow if moving
+       if (SV_ClientIsMoving(cl) == 1) {
+           SV_SendServerCommand(cl, "print \"^1You can't save your position while moving!\n\"");
+           return;
+        }
+    
+       // disallow if dead
+       if (ps->pm_type != PM_NORMAL) {
+           SV_SendServerCommand(cl, "print \"^1You must be alive and in-game to save your position!\n\"");
+           return;
+        }
+    
+       // disallow if crouched
+       if (ps->pm_flags & PMF_DUCKED) {
+           SV_SendServerCommand(cl, "print \"^1You can't save your position while being crouched!\n\"");
+           return;
+        }
+    
+       // disallow if not on a solid ground
+       if (ps->groundEntityNum != ENTITYNUM_WORLD) {
+           SV_SendServerCommand(cl, "print \"^1You must be standing on a solid ground to save your position!\n\"");
+           return;
+        }
+    } 
+
+    // save the position and angles
+    VectorCopy(ps->origin, cl->cm.savedPosition);
+    VectorCopy(ps->viewangles, cl->cm.savedPositionAngle);
+
+    // log command execution
+    SV_LogPrintf("ClientSavePosition: %d - %f - %f - %f\n",
+                                      cid,
+                                      cl->cm.savedPosition[0],
+                                      cl->cm.savedPosition[1],
+                                      cl->cm.savedPosition[2]);
+
+    SV_SendServerCommand(cl, "print \"^7Your ^6position ^7has been ^2saved\n\"");
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_LoadPosition_f
+// Load a previously saved position
+/////////////////////////////////////////////////////////////////////
+static void SV_LoadPosition_f(client_t *cl) {
+
+    int             i;
+    int             cid;
+    int             angle;
+    qboolean        jumprun;
+    playerState_t   *ps;
+    sharedEntity_t  *ent;
+
+    cid = cl - svs.clients;
+    jumprun = cl->cm.ready;
+
+    // if the server doesn't allow position save/load
+    if (!mod_allowPosSaving->integer) {
+        return;
+    }
+
+    ent = SV_GentityNum(cid);
+    ps = SV_GameClientNum(cid);
+
+    // if there is no saved position
+    if (!cl->cm.savedPosition[0] || !cl->cm.savedPosition[1] || !cl->cm.savedPosition[2]) {
+        SV_SendServerCommand(cl, "print \"^1There is no position to load on this map!\n\"");
+        return;
+    }
+
+    if (jumprun) {
+        // stop the timers
+        Cmd_TokenizeString("ready");
+        VM_Call(gvm, GAME_CLIENT_COMMAND, cl - svs.clients);
+    }
+
+    // copy back saved position
+    VectorCopy(cl->cm.savedPosition, ps->origin);
+
+    // set the view angle
+    for (i = 0; i < 3; i++) {
+        angle = ANGLE2SHORT(cl->cm.savedPositionAngle[i]);
+        ps->delta_angles[i] = angle - cl->lastUsercmd.angles[i];
+    }
+    ps->delta_angles[0] -= 2000;
+
+    VectorCopy(cl->cm.savedPositionAngle, ent->s.angles);
+    VectorCopy(ent->s.angles, ps->viewangles);
+
+    // clear client velocity
+    VectorClear(ps->velocity);
+
+    // regenerate stamina
+    ps->stats[playerStatsOffsets[getVersion()][OFFSET_PS_STAMINA]] = ps->stats[playerStatsOffsets[getVersion()][OFFSET_PS_HEALTH]] * 300;
+
+    if (jumprun) {
+        // restore ready status
+        Cmd_TokenizeString("ready");
+        VM_Call(gvm, GAME_CLIENT_COMMAND, cl - svs.clients);
+    }
+
+    // log command execution
+    SV_LogPrintf("ClientLoadPosition: %d - %f - %f - %f\n",
+                                      cid,
+                                      cl->cm.savedPosition[0],
+                                      cl->cm.savedPosition[1],
+                                      cl->cm.savedPosition[2]);
+    
+    SV_SendServerCommand(cl, "print \"^7Your ^6position ^7has been ^5loaded\n\"");
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_LoadSpeed_f
+// Load a saved position with current speed and view angles
+/////////////////////////////////////////////////////////////////////
+static void SV_LoadSpeed_f(client_t *cl) {
+    int             cid;
+    playerState_t   *ps;
+
+    cid = cl - svs.clients;
+    ps = SV_GameClientNum(cid);
+
+    if (!mod_allowPosSaving->integer || !mod_loadSpeedCmd->integer || SV_GetClientTeam(cid) == TEAM_SPECTATOR) {
+        return;
+    }
+
+    if (cl->cm.ready && mod_loadSpeedCmd->integer != 2) {
+        return;
+    }
+
+    if (!cl->cm.savedPosition[0] || !cl->cm.savedPosition[1] || !cl->cm.savedPosition[2]) {
+        SV_SendServerCommand(cl, "print \"^1There is no position to load on this map!\n\"");
+        return;
+    }
+
+    // copy back saved position and regenerate stamina
+    VectorCopy(cl->cm.savedPosition, ps->origin);
+    ps->stats[playerStatsOffsets[getVersion()][OFFSET_PS_STAMINA]] = ps->stats[playerStatsOffsets[getVersion()][OFFSET_PS_HEALTH]] * 300;
+
+    SV_SendServerCommand(cl, "print \"^7Your ^6position ^7has been ^4loaded\n\"");
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_NoFreeSave_f
+/////////////////////////////////////////////////////////////////////
+void SV_NoFreeSave_f(client_t *cl) {
+
+    if (!mod_allowPosSaving->integer || !mod_freeSaving->integer) {
+        return;
+    }
+
+    if (cl->cm.noFreeSave) {
+        cl->cm.noFreeSave = qfalse;
+        SV_SendServerCommand(cl, "print \"^7Free position saving turned: [^2ON^7]\n\"");
+    } else {
+        cl->cm.noFreeSave = qtrue;
+        SV_SendServerCommand(cl, "print \"^7Free position saving turned: [^1OFF^7]\n\"");
+    }
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_HidePlayers_f
+/////////////////////////////////////////////////////////////////////
+void SV_HidePlayers_f(client_t *cl) {
+
+    if (sv_gametype->integer != GT_JUMP) {
+        return;
+    }
+
+    if (!mod_enableJumpCmds->integer) {
+        return;
+    }
+
+    if (cl->cm.hidePlayers > 0) {
+        cl->cm.hidePlayers = 0;
+        SV_SendServerCommand(cl, "print \"^7Hide Players turned: [^1OFF^7]\n\"");
+    } else {
+        cl->cm.hidePlayers = 1;
+        SV_SendServerCommand(cl, "print \"^7Hide Players turned: [^2ON^7]\n\"");
+    }
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_InfiniteStamina_f
+/////////////////////////////////////////////////////////////////////
+void SV_InfiniteStamina_f(client_t *cl) {
+    int cid;
+    cid = cl - svs.clients;
+
+    if (sv_gametype->integer != GT_JUMP || !mod_enableJumpCmds->integer)
+        return;
+
+    if (SV_GetClientTeam(cid) == TEAM_SPECTATOR || cl->cm.ready)
+        return;
+
+    if (Cvar_VariableIntegerValue("g_stamina") == 2)
+       return;
+
+    if (cl->cm.infiniteStamina == 1 || (!cl->cm.infiniteStamina && mod_infiniteStamina->integer)) {
+       cl->cm.infiniteStamina = 2;
+       SV_SendServerCommand(cl, "print  \"^7Infinite Stamina turned: [^1OFF^7]\n\""); // back to g_stamina
+    } else {
+       cl->cm.infiniteStamina = 1;
+       SV_SendServerCommand(cl, "print  \"^7Infinite Stamina turned: [^2ON^7]\n\"");
+    }
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_InfiniteWallJumps_f
+/////////////////////////////////////////////////////////////////////
+void SV_InfiniteWallJumps_f(client_t *cl) {
+    int cid;
+    cid = cl - svs.clients;
+
+    if (sv_gametype->integer != GT_JUMP || !mod_enableJumpCmds->integer)
+        return;
+
+    if (SV_GetClientTeam(cid) == TEAM_SPECTATOR || cl->cm.ready)
+       return;
+
+    if (cl->cm.infiniteWallJumps == 1 || (!cl->cm.infiniteWallJumps && mod_infiniteWallJumps->integer)) {
+       cl->cm.infiniteWallJumps = 2;
+       SV_SendServerCommand(cl, "print  \"^7Infinite Wall Jumps turned: [^1OFF^7]\n\""); // back to g_walljumps
+    } else {
+       cl->cm.infiniteWallJumps = 1;
+       SV_SendServerCommand(cl, "print  \"^7Infinite Wall Jumps turned: [^2ON^7]\n\"");
+    }
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_ServerModInfo_f
+/////////////////////////////////////////////////////////////////////
+void SV_ServerModInfo_f(client_t* cl) {
+    SV_SendServerCommand(cl, "chat \"^2==============================================================\"");
+    SV_SendServerCommand(cl, "chat \"%s^7Server Version: %s\"", sv_tellprefix->string, Cvar_VariableString("version"));
+    SV_SendServerCommand(cl, "chat \"%s^7Game Version: ^1Urban Terror %s\"", sv_tellprefix->string, Cvar_VariableString("g_modversion"));
+    SV_SendServerCommand(cl, "chat \"^2==============================================================\"");
+    SV_SendServerCommand(cl, "chat \"%s^7Credits: ^3Titan Mod ^7was developed by ^5Pedrxd ^7& ^5Th3K1ll3r\"", sv_tellprefix->string);
+    SV_SendServerCommand(cl, "chat \"^2==============================================================\"");
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_HelpCmdsList_f
+/////////////////////////////////////////////////////////////////////
+void SV_HelpCmdsList_f(client_t* cl) {
+
+    char *version;
+    char *jump = "Jump Mode";
+    char *frag = "Frag Modes";
+
+    if (!mod_enableHelpCmd->integer) {
+        return;
+    }
+
+    if (sv_gametype->integer == GT_JUMP) {
+        version = jump;
+    } else {
+        version = frag;
+    }
+
+    if (version == jump) {
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-^7--------> Help Client - ^6List of Commands ^7[Jump Mode] <--------^8-\n\"");    
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8------------------------^7General Commands^8------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-    ^1/help           ^8-     ^2/playerlist     ^8-    ^2/cg_rgb        ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-    ^2/reconnect      ^8-                     ^8-    ^2/r_gamma       ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-    ^2/disconnect     ^8-     ^1/svModInfo      ^8-    ^2/sensitivity   ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-    ^2/connect        ^8-                     ^8-    ^2/bind          ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8--------------------------^7Game Commands^8-------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-         ^2$location             ^8-       ^2/regainstamina         ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-         ^2/name                 ^8-       ^2/save                  ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-         ^2/kill                 ^8-       ^2/load                  ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-         ^2/ready ^5(RUN)          ^8-       ^2/allowgoto             ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-         ^2/cg_ghost ^5<0|1>       ^8-       ^2/goto                  ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8- ^2/infiniteStamina       ^7[Turn ON/OFF Infinite Stamina]        ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8- ^2/infiniteWallJumps     ^7[Turn ON/OFF Infinite Wall Jumps]     ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8- ^2/hidePlayers           ^7[Make all other players invisible]    ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8- ^2/freeSave              ^7[Turn ON/OFF the free position saving]^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8- ^2/tell ^5<client> <message>                  ^7[Private Messages] ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8- ^2/callvote ^5nextmap <mapname> ^7or ^5cyclemap   ^7[Map Votes]        ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^2[INFO] ^7Free position saving:  [%s^7]\n\"", (mod_freeSaving->integer > 0) ? "^2ON" : "^1OFF");
+        SV_SendServerCommand(cl, "print  \"^2[INFO] ^7Current Map:  [^3%s^7]\n\"", sv_mapname->string);
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+
+    } else if (version == frag) {
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-^7--------> Help Client - ^6List of Commands ^7[Frag Mode] <--------^8-\n\"");    
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8------------------------^7General Commands^8------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-    ^1/help           ^8-     ^2/playerlist     ^8-    ^2/cg_rgb        ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-    ^2/reconnect      ^8-                     ^8-    ^2/r_gamma       ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-    ^2/disconnect     ^8-     ^1/svModInfo      ^8-    ^2/sensitivity   ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-    ^2/connect        ^8-                     ^8-    ^2/bind          ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8--------------------------^7Game Commands^8-------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-           ^2/name            ^8-            ^2$location            ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8-           ^2/kill            ^8-                                 ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8- ^2/tell ^5<client> <message>                  ^7[Private Messages] ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8- ^2/callvote ^5nextmap <mapname> ^7or ^5cyclemap   ^7[Map Votes]        ^8-\n\"");
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+        SV_SendServerCommand(cl, "print  \"^2[INFO] ^7Current Map:  [^3%s^7]\n\"", sv_mapname->string);
+        SV_SendServerCommand(cl, "print  \"^8----------------------------------------------------------------\n\"");
+    }
+}
+
+//===============================================================================
 typedef struct {
 	char	*name;
 	void	(*func)( client_t *cl );
@@ -1360,8 +2058,212 @@ static ucmd_t ucmds[] = {
 	{"stopdl", SV_StopDownload_f},
 	{"donedl", SV_DoneDownload_f},
 
-	{NULL, NULL}
+    {"save", SV_SavePosition_f},
+    {"savepos", SV_SavePosition_f},
+    {"load", SV_LoadPosition_f},
+    {"loadpos", SV_LoadPosition_f},
+    {"loadSpeed", SV_LoadSpeed_f},
+    {NULL, NULL}
 };
+
+static ucmd_t ucmds_floodControl[] = {
+    {"freeSave", SV_NoFreeSave_f},
+    {"hidePlayers", SV_HidePlayers_f},
+    {"infiniteStamina", SV_InfiniteStamina_f},
+    {"stamina", SV_InfiniteStamina_f},
+    {"infiniteWallJumps", SV_InfiniteWallJumps_f},
+    {"walljumps", SV_InfiniteWallJumps_f},
+    {"svModInfo", SV_ServerModInfo_f},
+    {"help", SV_HelpCmdsList_f},
+    {NULL, NULL}
+};
+//===============================================================================
+
+char *str_replace2(char *orig, char *rep, char *with) {
+    char *result; // the return string
+    char *ins;    // the next insert point
+    char *tmp;    // varies
+    int len_rep;  // length of rep (the string to remove)
+    int len_with; // length of with (the string to replace rep with)
+    int len_front; // distance between rep and end of last rep
+    int count;    // number of replacements
+
+    // sanity checks and initialization
+    if (!orig || !rep)
+        return NULL;
+    len_rep = strlen(rep);
+    if (len_rep == 0)
+        return NULL; // empty rep causes infinite loop during count
+    if (!with)
+        with = "";
+    len_with = strlen(with);
+
+    // count the number of replacements needed
+    ins = orig;
+    for (count = 0; tmp = strstr(ins, rep); ++count) {
+        ins = tmp + len_rep;
+    }
+
+    tmp = result = malloc(strlen(orig) + (len_with - len_rep) * count + 1);
+
+    if (!result)
+        return NULL;
+
+    // first time through the loop, all the variable are set correctly
+    // from here on,
+    //    tmp points to the end of the result string
+    //    ins points to the next occurrence of rep in orig
+    //    orig points to the remainder of orig after "end of rep"
+    while (count--) {
+        ins = strstr(orig, rep);
+        len_front = ins - orig;
+        tmp = strncpy(tmp, orig, len_front) + len_front;
+        tmp = strcpy(tmp, with) + len_with;
+        orig += len_front + len_rep; // move to next "end of rep"
+    }
+    strcpy(tmp, orig);
+    return result;
+}
+
+
+char* badwords[43] = { 	"fuck", "dick", "shit", "slut", "hure", "cunt", "homo", "puta", "nazi", "fick", "fotze", "opfer", "arsch", 
+						"spack", "nutte", "spast", "bitch", "kurwa", "pussy", "penis", "hitler", "muschi", "biatch", "nigger", "putain", 
+						"asshole", "maricon", "wixxer", "fdp", "ta geule", "fucker", "mother fucker", "mofo", "motherfucker", "kys", 
+						"neger", "nigg", "niga", "nigga", "retard", "retarded", "whore", "fucking" 
+					};
+
+char* replacefor[5] = { "n1", "cya", "hello", "hey", "thanks" };
+char* replacewith[5] = { "^2Nice One", "^8See you later", "^2Hey",  "^6hi", "^2Thanks!" };
+
+char* getNewMessage(char* message, client_t *cl) {
+	for (int i = 0; i < sizeof(badwords) / sizeof(const char*); i++){
+		message = str_replace2(message, badwords[i], va("^1*****^%i", cl->chatcolour));
+	}
+	for (int i = 0; i < sizeof(replacefor) / sizeof(const char*); i++){
+		message = str_replace2(message, replacefor[i], va("%s^%i", replacewith[i] ,cl->chatcolour));
+	}
+	return message;
+}
+
+char* getNewPrefixFFA(client_t *cl, playerState_t *ps) {
+	
+	char* specTag 	= "^7(SPEC)";
+	char* authedTag = "^2[authed]";
+	char* userTag 	= "^7[user]";
+	char* adminTag 	= "^3[admin]";
+	char* ownerTag 	= "^1[owner]";
+
+	char* messagePrefix = "";
+
+	if (ps->persistant[3] == 3 || (ps->pm_flags & 1024)) {
+		messagePrefix = va("%s%s", messagePrefix, specTag);
+	}
+	if (cl->isauthed) {
+		messagePrefix = va("%s%s", messagePrefix, authedTag);
+	}
+	if (cl->isuser) {
+		messagePrefix = va("%s%s", messagePrefix, userTag);
+	}
+	if (cl->isadmin) {
+		messagePrefix = va("%s%s", messagePrefix, adminTag);
+	}
+	if (cl->isowner) {
+		messagePrefix = va("%s%s", messagePrefix, ownerTag);
+	}
+	return(messagePrefix);
+}
+
+char* getNewPrefixSR8(playerState_t *ps) {
+	char *prefix = "";
+	qboolean isDead = qfalse;
+
+	int clientTeam = *(int*)((void*)ps+gclientOffsets[getVersion()][OFFSET_TEAM]);
+
+	// Check if the client is dead
+	if ((clientTeam == 1 || clientTeam == 2) && ps->pm_flags & 1024) {
+		// The client is in team RED or BLUE and is currently spectating someone (so he must be dead)
+		isDead = qtrue;
+	}
+
+	// Spec Team
+	if (clientTeam == 3) {
+		prefix = "^7[SPEC]";
+	}
+	// Red Team
+	else if (clientTeam == 1) {
+		prefix = "^1[RED]";
+	}
+	// Blue Team
+	else if (clientTeam == 2) {
+		prefix = "^4[BLUE]";
+	}
+	// Add the DEAD tag if required
+	if (isDead) {
+		prefix = va("%s%s", prefix, "^7(DEAD)");
+	}
+	return(prefix);
+}
+
+char* getZombiePrefix(playerState_t *ps) {
+	char *prefix = "";
+	qboolean isDead = qfalse;
+
+	int clientTeam = *(int*)((void*)ps+gclientOffsets[getVersion()][OFFSET_TEAM]);
+
+	// Check if the client is dead
+	if ((clientTeam == 1 || clientTeam == 2) && ps->pm_flags & 1024) {
+		// The client is in team RED or BLUE and is currently spectating someone (so he must be dead)
+		isDead = qtrue;
+	}
+
+	// Spec Team
+	if (clientTeam == 3) {
+		prefix = "^7[SPEC]";
+	}
+	// Red Team
+	else if (clientTeam == 1) {
+		prefix = "^1[ZOMBIE]";
+	}
+	// Blue Team
+	else if (clientTeam == 2) {
+		prefix = "^4[HUMAN]";
+	}
+	// Add the DEAD tag if required
+	if (isDead) {
+		prefix = va("%s%s", prefix, "^7(DEAD)");
+	}
+	return(prefix);
+}
+
+int getColourPrefix(client_t *cl) {
+	int defaultColour = 7;
+	int level = cl->level;
+	
+	if (level < 100) {
+		return(defaultColour);
+	}
+	else if (level >= 100 && level < 200) {
+		return(3); // Yellow
+	}
+	else if (level >= 200 && level < 300) {
+		return(8); // Orange
+	}
+	else if (level >= 300 && level < 400) {
+		return(4); // Blue
+	}
+	else if (level >= 400 && level < 500) {
+		return(5); // Cyan
+	}
+	else if (level >= 500 && level < 750) {
+		return(2); // Green
+	}
+	else if (level == 999) {
+		return(1); // Red
+
+	} else {
+		return(defaultColour);
+	}
+}
 
 /*
 ==================
@@ -1380,40 +2282,230 @@ void SV_ExecuteClientCommand( client_t *cl, const char *s, qboolean clientOK ) {
 	char		*arg;
 	qboolean 	bProcessed = qfalse;
 	qboolean 	exploitDetected = qfalse;
-	
+	playerState_t *ps;
+
 	Cmd_TokenizeString( s );
 
 	// see if it is a server level command
 	for (u=ucmds ; u->name ; u++) {
-		if (!strcmp (Cmd_Argv(0), u->name) ) {
+		if (!Q_stricmp (Cmd_Argv(0), u->name) ) {
 			u->func( cl );
 			bProcessed = qtrue;
 			break;
 		}
 	}
 
-	if (clientOK) {
+    // cmds with floodControl
+    if (!bProcessed) {
+        for (u=ucmds_floodControl ; u->name ; u++) {
+            if (!Q_stricmp(Cmd_Argv(0), u->name)) {
+                if (clientOK) { 
+                    u->func(cl); 
+                }
+                bProcessed = qtrue;
+                break;
+            }
+        }
+    }
 
+	if (clientOK) {
+        int cid;
+        cid = cl - svs.clients;
+		ps = SV_GameClientNum(cid);
 		// pass unknown strings to the game
 		if ((!u->name) && (sv.state == SS_GAME) && (cl->state == CS_ACTIVE)) {
 			Cmd_Args_Sanitize();
-
+			char* message = getNewMessage(Cmd_ArgsFrom(1), cl);
 			argsFromOneMaxlen = -1;
+			if (Q_stricmp("say", Cmd_Argv(0)) == 0 ) {
+
+				ps = SV_GameClientNum(cl - svs.clients);
+				argsFromOneMaxlen = MAX_SAY_STRLEN;
+
+				//Com_Printf( "->%s.\n", CopyString(Cmd_Args()) );
+				//Com_Printf( "->%s.\n", Cmd_ArgsFrom(1) );
+				//Cmd_ArgsFrom(1) will not work for logfile parsers as binds are not included here.
+
+				if (mod_customchat->integer && sv_gametype->integer == GT_FFA){
+                	if (!cl->muted){
+						// Send the chat message
+                	    SV_SendServerCommand(NULL, "chat \"%s^7%s^3:^%i %s\"", getNewPrefixFFA(cl, ps), cl->name, cl->chatcolour, message);
+					}
+					SV_LogPrintf("say: %i %s: %s\n", ps->clientNum, cl->name, CopyString(Cmd_Args()));			
+					return;
+				}
+
+				else if (mod_customchat->integer && sv_gametype->integer == GT_SURVIVOR){
+					if (!cl->muted){
+						// Send the chat message
+						SV_SendServerCommand(NULL, "chat \"%s^7[^2%i^7]^3%s:^%i %s\"", getZombiePrefix(ps), cl->level, cl->name, getColourPrefix(cl), message);
+					}
+					SV_LogPrintf("say: %i %s: %s\n", ps->clientNum, cl->name, CopyString(Cmd_Args()));
+					return;
+				}
+
+				else if (mod_customchat->integer && sv_gametype->integer == GT_SURVIVOR){
+					// Default custom chat with levelsystem
+					if (!cl->muted){
+						// Send the chat message
+                		SV_SendServerCommand(NULL, "chat \"%s^7[^2%i^7]^3%s:^%i %s\"", getNewPrefixSR8(ps), cl->level, cl->name, getColourPrefix(cl), message);
+					}
+					SV_LogPrintf("say: %i %s: %s\n", ps->clientNum, cl->name, CopyString(Cmd_Args()));
+					return;
+				}
+
+				else if (mod_customchat->integer && mod_1v1arena->integer){
+					if (!cl->muted){
+						int team;
+						team = *(int*)((void*)ps+gclientOffsets[getVersion()][OFFSET_TEAM]);
+						if (team != 3) {
+							// Send the chat message
+							SV_SendServerCommand(NULL, "chat \"^7[^3Arena ^5%i^7][^3SP:^5%i^7]^3%s: %s\"", cl->arena+1, cl->skill, cl->colourName, message);
+						} else {
+							SV_SendServerCommand(NULL, "chat \"^7[^5No Arena^7][^3SP:^5%i^7]^3%s: %s\"", cl->skill, cl->colourName, message);
+						}
+					}
+					// Note: Do NOT use the playerstate number here, when parsing, the client might be dead
+					// 		 and therefore ps->clientNum will hold the id of the person being spectated
+					SV_LogPrintf("say: %i %s: %s\n", cl->playernum, cl->name, CopyString(Cmd_Args()));
+					return;
+				}
+
+
+			}
+
+			/*
 			if (Q_stricmp("say", Cmd_Argv(0)) == 0 || Q_stricmp("say_team", Cmd_Argv(0)) == 0) {
 				argsFromOneMaxlen = MAX_SAY_STRLEN;
-			}
+
+				p = Cmd_Argv(1);
+				while (*p == ' ') p++;
+
+				//Check if the message start with some of the command triggereds
+				if (((*p == '!') || (*p == '@') || (*p == '&') || (*p == '/')) && mod_hideCmds->integer)
+				{
+					if(mod_hideCmds->integer == 1)
+						SV_SendServerCommand(cl, "chat \"%s^7%s^3: %s\"", sv_tellprefix->string, cl->colourName, Cmd_Args());
+					SV_LogPrintf("say: %i %s: %s\n", ps->clientNum, cl->name, CopyString(Cmd_Args()));
+					return;
+				}
+
+				//If pm was not mute previusly, force mute now
+                if (Q_stricmp("!pm", p) == 0 || Q_stricmp("!tell", p) == 0)
+                {
+                    SV_SendServerCommand(cl, "chat \"%s^7%s^3: %s\"", sv_tellprefix->string, cl->colourName, Cmd_Args());
+    				SV_LogPrintf("say: %i %s: %s\n", ps->clientNum, cl->name, CopyString(Cmd_Args()));
+    				return;
+                }
+				// Hidden cmd prefix (always active)
+                if (Q_stricmp("<!", p) == 0)
+                {
+                    SV_SendServerCommand(cl, "chat \"%s^7%s^3: %s\"", sv_tellprefix->string, cl->colourName, Cmd_Args());
+    				SV_LogPrintf("say: %i %s: %s\n", ps->clientNum, cl->name, CopyString(Cmd_Args()));
+    				return;
+                }
+			*/
+            // Global Spectator Chat Patch
+            // It's only applied on frag gametypes. Spectators can still talking between them with say_team
+            // @Th3K1ll3r: As spectators, I don't think they need to use chat variables (public), so it's fine
+            if (Q_stricmp("say", Cmd_Argv(0)) == 0 && sv_gametype->integer != GT_JUMP && SV_GetClientTeam(cid) == TEAM_SPECTATOR && mod_specChatGlobal->integer) {
+                argsFromOneMaxlen = MAX_SAY_STRLEN;
+                SV_SendServerCommand(NULL, "chat \"^7(SPEC) %s^3: %s\"", cl->colourName, Cmd_Args());
+                SV_LogPrintf("say: %i %s^7: %s\n", ps->clientNum, cl->colourName, CopyString(Cmd_Args()));
+                return;
+            }
 			else if (Q_stricmp("tell", Cmd_Argv(0)) == 0) {
 				// A command will look like "tell 12 hi" or "tell foo hi".  The "12"
 				// and "foo" in the examples will be counted towards MAX_SAY_STRLEN,
 				// plus the space.
 				argsFromOneMaxlen = MAX_SAY_STRLEN;
+				if(!mod_allowTell->integer)
+				{
+	                SV_SendServerCommand(cl, "print \"^1This server doesn't allow private messages!\n\"");
+	                return;
+				}
+				if (mod_gunsmod->integer) {
+					if (!cl->isadmin && !cl->isowner) {
+						SV_SendServerCommand(cl, "print \"^1You must be an admin to send private messages!\n\"");
+						return;
+					}
+				}
 			}
 			else if (Q_stricmp("ut_radio", Cmd_Argv(0)) == 0) {
 				// We add 4 to this value because in a command such as
 				// "ut_radio 1 1 affirmative", the args at indices 1 and 2 each
 				// have length 1 and there is a space after them.
 				argsFromOneMaxlen = MAX_RADIO_STRLEN + 4;
-			}
+				if(!mod_allowRadio->integer)
+				{
+	                SV_SendServerCommand(cl, "print \"^1The radio chat is disabled on this server!\n\"");
+	                return;
+				}
+
+			} else if (Q_stricmp("ut_weapdrop", Cmd_Argv(0)) == 0 && !mod_allowWeapDrop->integer) {
+                SV_SendServerCommand(cl, "print \"^1This server doesn't allow dropping weapons!\n\"");
+                return;
+
+            } else if (Q_stricmp("ut_itemdrop", Cmd_Argv(0)) == 0 && !mod_allowItemDrop->integer) {
+                SV_SendServerCommand(cl, "print \"^1This server doesn't allow dropping items!\n\"");
+                return;
+
+            } else if (Q_stricmp("ut_itemdrop", Cmd_Argv(0)) == 0 && (!Q_stricmp("flag", Cmd_Argv(1)) || !Q_stricmp("1", Cmd_Argv(1)) || !Q_stricmp("2", Cmd_Argv(1))) && !mod_allowFlagDrop->integer) {
+                SV_SendServerCommand(cl,"print \"^1This server doesn't allow dropping the flag!\n\"");
+                return;
+
+            } else if (Q_stricmp("kill", Cmd_Argv(0)) == 0 && !mod_allowSuicide->integer) {
+                SV_SendServerCommand(cl, "print \"^1This server doesn't allow suiciding!\n\"");
+                return;
+            } else if (Q_stricmp("kill", Cmd_Argv(0)) == 0 && ps->stats[playerStatsOffsets[getVersion()][OFFSET_PS_HEALTH]] < mod_minKillHealth->integer) {
+                SV_SendServerCommand(cl, "print \"^1You need a minimum of ^2%i percent ^1of health to kill yourself!\n\"", mod_minKillHealth->integer);
+                return;
+            } else if (Q_stricmp("team", Cmd_Argv(0)) == 0 && ps->stats[playerStatsOffsets[getVersion()][OFFSET_PS_HEALTH]] < mod_minTeamChangeHealth->integer && SV_GetClientTeam(cid) != TEAM_SPECTATOR) {
+                SV_SendServerCommand(cl, "print \"^1You need a minimum of ^2%i percent ^1of health to change of team!\n\"", mod_minTeamChangeHealth->integer);
+                return;
+            } else if(Q_stricmp("callvote", Cmd_Argv(0)) == 0 && !mod_allowVote->integer) {
+                SV_SendServerCommand(cl, "print \"^1Vote system is disabled on this server!\n\"");
+                return;
+
+            } else if(Q_stricmp("team", Cmd_Argv(0)) == 0) {
+                switch(mod_allowTeamSelection->integer) {
+                    case 0:
+                        SV_SendServerCommand(cl, "print \"^1Team selection system is disabled on this server!\n\"");
+                        return;
+                    case 2:
+                        if(Q_stricmp("s", Cmd_Argv(1)) != 0 && Q_stricmp("free", Cmd_Argv(1)) != 0) {
+                            SV_SendServerCommand(cl, "print \"^1You can only spectate or auto join in this server!\n\"");
+                            return;
+                        }
+                        break;
+                    case 3:
+                    {
+                        team_t team = *(int*)((void*)ps+gclientOffsets[getVersion()][OFFSET_TEAM]);
+                        if((Q_stricmp("free", Cmd_Argv(1)) == 0)) {
+                            if(team == TEAM_SPECTATOR) {
+                                break;
+                            } else {
+                                SV_SendServerCommand(cl, "print \"^1Only spectators can do auto join in this server!\n\"");
+                                return;
+                            }
+                        }
+                        if(Q_stricmp("s", Cmd_Argv(1)) != 0) {
+                            SV_SendServerCommand(cl, "print \"^1You can only spectate or auto join in this server!\n\"");
+                            return;
+                        }
+                        break;
+                    }
+                }
+
+                if (mod_fastTeamChange->integer) {
+                    Cmd_ExecuteString(va("forceteam %d %s", cid, Cmd_Argv(1)));
+                    return;
+                }
+
+            } else if(Q_stricmp("ready", Cmd_Argv(0)) == 0) {
+                // In-game client's timer in jump mode will be handled by parsing scoress
+            }
+
 			if (argsFromOneMaxlen >= 0) {
 				charCount = 0;
 				dollarCount = 0;
@@ -1444,7 +2536,7 @@ void SV_ExecuteClientCommand( client_t *cl, const char *s, qboolean clientOK ) {
 			}
 			if (exploitDetected) {
 				Com_Printf("Buffer overflow exploit radio/say, possible attempt from %s\n", NET_AdrToString(cl->netchan.remoteAddress));
-				SV_SendServerCommand(cl, "print \"Chat dropped due to message length constraints.\n\"");
+				SV_SendServerCommand(cl, "print \"Chat dropped due to message length constraints!\n\"");
 				return;
 			}
 
@@ -1452,7 +2544,7 @@ void SV_ExecuteClientCommand( client_t *cl, const char *s, qboolean clientOK ) {
 		}
 	}
 	else if (!bProcessed) {
-		Com_DPrintf( "client text ignored for %s: %s\n", cl->name, Cmd_Argv(0) );
+		Com_DPrintf( "client text ignored for %s^7: %s\n", cl->name, Cmd_Argv(0) );
 	}
 }
 
@@ -1474,11 +2566,11 @@ static qboolean SV_ClientCommand( client_t *cl, msg_t *msg ) {
 		return qtrue;
 	}
 
-	Com_DPrintf( "clientCommand: %s : %i : %s\n", cl->name, seq, s );
+	Com_DPrintf( "clientCommand: %s ^7: %i : %s\n", cl->name, seq, s );
 
 	// drop the connection if we have somehow lost commands
 	if ( seq > cl->lastClientCommand + 1 ) {
-		Com_Printf( "Client %s lost %i clientCommands\n", cl->name, 
+		Com_Printf( "Client %s ^7lost %i clientCommands\n", cl->name,
 			seq - cl->lastClientCommand + 1 );
 		SV_DropClient( cl, "Lost reliable commands" );
 		return qfalse;
@@ -1514,6 +2606,407 @@ static qboolean SV_ClientCommand( client_t *cl, msg_t *msg ) {
 	Com_sprintf(cl->lastClientCommandString, sizeof(cl->lastClientCommandString), "%s", s);
 
 	return qtrue;		// continue procesing
+}
+
+
+//==================================================================================
+
+void MOD_AutoHealth(client_t *cl)
+{
+	gentity_t *ent;
+
+	//If a player have custom configuration for health this function will preserver it over the global config
+	if(!mod_enableHealth->integer && !cl->cm.perPlayerHealth)
+		return;
+
+	if(cl->cm.lastAutoHealth < svs.time) {
+		cl->cm.lastAutoHealth = svs.time + (cl->cm.perPlayerHealth ? cl->cm.timeoutHealth : mod_timeoutHealth->integer);
+
+		if(cl->state != CS_ACTIVE)
+			return;
+
+		ent = (gentity_t *)SV_GentityNum(cl - svs.clients);
+		if(ent->health < (cl->cm.perPlayerHealth ? cl->cm.limitHealth : mod_limitHealth->integer)) {
+			if((cl->cm.perPlayerHealth ? !cl->cm.whenmovingHealth : !mod_whenMoveHealth->integer) && SV_ClientIsMoving(cl))
+				return;
+			MOD_AddHealth(cl, (cl->cm.perPlayerHealth ? cl->cm.stepHealth : mod_addAmountOfHealth->integer));
+			cl->cm.turnOffUsed = 1;
+		}else
+		{
+			if(cl->cm.turnOffWhenFinish && cl->cm.turnOffUsed)
+				cl->cm.perPlayerHealth = 0;
+		}
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_GhostThink
+// Fixes the bugged cg_ghost in jump mode
+/////////////////////////////////////////////////////////////////////
+void SV_GhostThink(client_t *cl) {
+
+    int               i;
+    int               num;
+    int               touch[MAX_GENTITIES];
+    float             rad;
+    vec3_t            mins, maxs;
+    sharedEntity_t    *ent;
+    sharedEntity_t    *oth;
+
+    int cid;
+    cid = cl - svs.clients;
+
+    // if we are not playing jump mode
+    if (sv_gametype->integer != GT_JUMP) {
+        return;
+    }
+
+    // if the client is a spectator
+    if (SV_GetClientTeam(cid) == TEAM_SPECTATOR) {
+        return;
+    }
+
+    // if the client has cg_ghost disabled
+    if (!cl->cm.ghost) {
+        return;
+    }
+
+    // get the correspondent entity
+    ent = SV_GentityNum(cid);
+    rad = Com_Clamp(4.0, 1000.0, mod_ghostRadius->value);
+
+    // calculate the box
+    for (i = 0; i < 3; i++) {
+        mins[i] = ent->r.currentOrigin[i] - rad;
+        maxs[i] = ent->r.currentOrigin[i] + rad;
+    }
+
+    // get the entities the client is touching (the bounding box)
+    num = SV_AreaEntities(mins, maxs, touch, MAX_GENTITIES);
+
+    for (i = 0; i < num; i++) {
+
+        // if the entity we are touching is not a client 
+        if (touch[i] < 0 || touch[i] >= sv_maxclients->integer) {
+            continue;
+        }
+
+        // get the touched entity
+        oth = SV_GentityNum(touch[i]);
+
+        // if the entity is the client itself
+        if (ent->s.number == oth->s.number) {
+            continue;
+        }
+
+        // set the content mask to both
+        if (ent->r.contents & CONTENTS_BODY) {
+            ent->r.contents &= ~CONTENTS_BODY;
+            ent->r.contents |= CONTENTS_CORPSE;
+        }
+        if (oth->r.contents & CONTENTS_BODY) {
+            oth->r.contents &= ~CONTENTS_BODY;
+            oth->r.contents |= CONTENTS_CORPSE;
+        }
+    }
+}
+
+void teleportAttached(client_t *cl)
+{
+	playerState_t *ps2;
+
+	int cid = (cl - svs.clients);
+	ps2 = SV_GameClientNum(cl->attachedto);
+
+	char cmd2[64];
+	Com_sprintf(cmd2, sizeof(cmd2), "tp %i %f %f %f", cid, ps2->origin[0], ps2->origin[1], ps2->origin[2] + 80);
+	Cmd_ExecuteString(cmd2);
+
+	unsigned int time = Com_Milliseconds();
+	if (time > cl->stopattach) {
+		client_t *cl2;
+		cl2 = &svs.clients[cl->attachedto];
+		cl->isattached = qfalse;
+		cl->attachedto = 0;
+		cl->stopattach = 0;
+	    cl2->hasattached = qfalse;
+	}
+}
+
+void addMedkitHealth(client_t *cl)
+{
+	char cmd2[64];
+	unsigned int time = Com_Milliseconds();
+    int cid;
+    cid = cl - svs.clients;
+
+	if (cl->lastmedkittime == 0 || (time - cl->lastmedkittime) > 430) {
+		Com_sprintf(cmd2, sizeof(cmd2), "addhealth %i 1", cid);
+		Cmd_ExecuteString(cmd2);
+		cl->lastmedkittime = time;
+	}
+}
+
+
+
+/*
+==================
+SV_CheckLocation
+Returns 1 or -1
+1 = yes player i is in area of xy with the r
+-1 = no player i isnt in area of xy with the r
+==================
+*/
+
+int SV_CheckLocation( float x, float y, float z, float r, int i ) {
+	playerState_t *ps;
+    ps = SV_GameClientNum(i);
+    if (ps->origin[0] > x-r &&
+        ps->origin[0] < x+r &&
+        ps->origin[1] > y-r &&
+        ps->origin[1] < y+r &&
+        ps->origin[2] > z-r &&
+        ps->origin[2] < z+r
+        ) {
+        return 1;
+    }
+	return -1;
+}
+
+/*
+================
+SV_TurnpikeBlocker
+=================
+*/
+
+void SV_TurnpikeBlocker(float x, float y, float z, float r, float x2, float y2, float z2) {
+    
+
+	int i;
+	char cmd[254];
+	char cmd2[254];
+
+	for (i=0 ; i < sv_maxclients->integer ; i++) {
+        if (SV_CheckLocation(x, y, z, r, i) == 1) { // 
+			Com_sprintf(cmd2, sizeof(cmd2), "tp %i %f %f %f",i, x2, y2, z2);
+            Com_sprintf(cmd, sizeof(cmd), "sendclientcommand %i cp \"^1Restricted play area \n ^5Reason: ^6Not enough players online \n ^7[^1%i^7/^26^7] ^3Players ^2Online\"\n", i, sv.currplayers );
+            Cmd_ExecuteString(cmd);
+			Cmd_ExecuteString(cmd2);
+		}
+    }
+}
+
+void checkGhostMode (void) {
+	unsigned int time = Com_Milliseconds();
+	int stopTime = time - sv.stopAntiBlockTime;
+	if (stopTime > 0 && sv.checkGhostMode) {
+		sv.checkGhostMode = qfalse;
+		sv.stopAntiBlockTime = 0;
+		Cmd_ExecuteString(va("mod_ghostPlayers 0"));
+	}
+}
+
+/*
+==================
+Levelsystem
+==================
+*/
+void updateClientName(client_t *cl)
+{
+	char* toreplace = "XXXXXXXXXXXXX";
+
+	// The client name we will use
+	char customname[128];
+	Q_strncpyz(customname, cl->lastcustomname, sizeof(customname));
+
+	// The Configstring we will use
+	char mycfgstring[256];
+	Q_strncpyz(mycfgstring, cl->defaultconfigstr, sizeof(mycfgstring));
+
+	// Now replace toreplace with the customname
+	char* mynewstring = str_replace2(mycfgstring, toreplace, customname);
+
+	// Finally: Set the string
+	SV_SetConfigstring((544 + cl->clientgamenum), mynewstring);
+}
+
+/*
+==================
+Spectator feature
+==================
+*/
+
+// Todo: Track namechanges and update names!
+
+char* concat(const char *s1, const char *s2)
+{
+    const size_t len1 = strlen(s1);
+    const size_t len2 = strlen(s2);
+    char *result = malloc(len1 + len2 + 1);
+    memcpy(result, s1, len1);
+    memcpy(result + len1, s2, len2 + 1);
+    return result;
+}
+
+char *strremove(char *str, const char *sub) {
+    char *p, *q, *r;
+    if ((q = r = strstr(str, sub)) != NULL) {
+        size_t len = strlen(sub);
+        while ((r = strstr(p = r + len, sub)) != NULL) {
+            while (p < r)
+                *q++ = *p++;
+        }
+        while ((*q++ = *p++) != '\0')
+            continue;
+    }
+    return str;
+}
+
+void announceMessageToClient(client_t *speccedClient, char* spectatorName) {
+	SV_SendServerCommand(speccedClient, "chat \"^6%s ^3 is now ^2spectating ^5you.\"", spectatorName);
+}
+
+void addToClientsList(client_t *speccedClient, client_t *cl){
+	// Get the current spectator list
+	char specs[256];
+	Q_strncpyz(specs, speccedClient->spectators, 256);
+
+	// The string we want to add
+	char* toadd = va("^7|^8%s", cl->name);
+
+	// Append to it
+	char* newspecs = concat(specs, toadd);
+
+	// Set the new list
+	Q_strncpyz(speccedClient->spectators, newspecs, 256);
+	free(newspecs);
+}
+
+void removeFromClientsList(client_t *cl) {
+	// Return if no previous client
+	if (cl->cidLastSpecd == -1){
+		return;
+	}
+	client_t *lastSpeccedClient = &svs.clients[cl->cidLastSpecd];
+
+	// Get the current spectator list
+	char specs[256];
+	Q_strncpyz(specs, lastSpeccedClient->spectators, 256);
+	// The string we want to remove
+	char* toremove = va("^7|^8%s", cl->lastName);
+	// The new spectator list
+	char* newspecs = strremove(specs, toremove);
+	// Set the new list
+	Q_strncpyz(lastSpeccedClient->spectators, newspecs, 256);
+}
+
+void updateJumpClientName(client_t *cl, int type, client_t *cl2, client_t *cl3) {
+
+	static const int 	NEW 			= 1;
+	static const int 	CLEAR 			= 2;
+	static const int 	NOBODY			= 3;
+
+	char* 				toreplace 		= "XXXXXXXXXXXXX";
+
+	int clcid = cl->cid;
+
+	// The client name we will use
+	char clientName[128];
+
+	// The config string we will use
+	char nameCfgString[256];
+	Q_strncpyz(nameCfgString, cl->nameConfigString, sizeof(nameCfgString));
+
+	// The client is spectating someone for the first time
+	// or the client is spectating someone else
+	if (type == NEW) {
+		char* nameToUse = va("%s ^3spectating ^6%s", cl->name, cl2->name);
+		Q_strncpyz(clientName, nameToUse, sizeof(clientName));
+	}
+
+	// The client is not spectating anyone anymore, reset it to default
+	// So the client is probably jumping
+	if (type == CLEAR) {
+		char* nameToUse = va("%s^7", cl->name);
+		Q_strncpyz(clientName, nameToUse, sizeof(clientName));
+	}
+
+	// The client is a spectator but not spectating anyone (ghost)
+	if (type == NOBODY) {
+		char* nameToUse = va("%s ^3spectating ^8Nobody.", cl->name);
+		Q_strncpyz(clientName, nameToUse, sizeof(clientName));
+	}
+
+	// Now set the new config string
+	char* newCfgString = str_replace2(nameCfgString, toreplace, clientName);
+	SV_SetConfigstring((544 + clcid), newCfgString);
+
+}
+
+/*
+FIXME
+This does not work, the clients location is recognized correctly however in the location string
+it'll come up as "unknown" (ingame), the person spectating will get the correct location.
+
+
+void forceLocationUpdate(client_t *speccedClient) {
+
+	if (speccedClient->spectators[0] != '\0') {
+		// client has spectators
+		Cmd_ExecuteString(va("location %s \"^3%s ^7[^8%s^7] | ^9Spectators: ^8%s\" 0 1\n", speccedClient->name, speccedClient->name, currloc, speccedClient->spectators));
+	} else {
+		Cmd_ExecuteString(va("location %s \"^3%s ^7[^8%s^7] | ^9Spectators: ^8Nobody is watching you.\" 0 1\n", speccedClient->name, speccedClient->name, currloc));
+	}
+}
+*/
+
+void checkSpecClient(client_t *cl, playerState_t *ps) {
+	if (*(int*)((void*)ps+gclientOffsets[getVersion()][OFFSET_TEAM]) != 3) {
+		// Client is not a spectator
+		return;
+	}
+	// If the client is currently spectating someone (if so, ps->clientNum will hold the cid of the person being spectated)
+	qboolean currentlySpectating = ps->pm_flags & 1024;
+
+	if (!currentlySpectating) {
+		// The client is flying around in ghostmode, set the name to spectating nobody
+		updateJumpClientName(cl, 3, 0, 0);
+		client_t *lastSpeccedClient = &svs.clients[cl->cidLastSpecd];
+
+		if (cl->cidLastSpecd != -1 && lastSpeccedClient) {
+			removeFromClientsList(cl);
+			cl->cidLastSpecd = -1;
+			cl->cidCurrSpecd = -1;
+			//updateJumpClientLocation(lastSpeccedClient);
+		}
+		return;
+	}
+
+	client_t *speccedClient = &svs.clients[ps->clientNum];
+	playerState_t *speccedClientState = SV_GameClientNum(speccedClient - svs.clients);
+	cl->cidCurrSpecd = speccedClientState->clientNum;
+
+	if (currentlySpectating && cl->cidLastSpecd != cl->cidCurrSpecd) {
+
+		// We are spectating a new person
+		// -> Change our scoreboard name
+		updateJumpClientName(cl, 1, speccedClient, 0);
+
+		// -> Remove us from the old clients list
+		removeFromClientsList(cl);
+
+		// -> Add us to the new clients list
+		addToClientsList(speccedClient, cl);
+
+		// -> Announce to the new person that we are now spectating them
+		announceMessageToClient(speccedClient, cl->colourName);
+
+		// -> Update the clients location string FIXME
+		//forceLocationUpdate(speccedClient);
+
+		cl->cidLastSpecd = cl->cidCurrSpecd;
+
+	}
 }
 
 /*
@@ -1553,7 +3046,7 @@ void setCampCoords (client_t *cl, playerState_t *ps) {
 
 void checkCampers (client_t *cl) {
 	int cid;
-    	cid = cl - svs.clients;
+    cid = cl - svs.clients;
 
 	// Don't check bots, let them camp
 	if (cl->gentity->r.svFlags & SVF_BOT) {
@@ -1564,7 +3057,7 @@ void checkCampers (client_t *cl) {
 	if (SV_GetClientTeam(cid) == TEAM_SPECTATOR) {
 		return;
 	}
-	
+
 	unsigned int time = Com_Milliseconds();
 	playerState_t *ps;
 	ps = SV_GameClientNum(cl - svs.clients);
@@ -1574,27 +3067,26 @@ void checkCampers (client_t *cl) {
 		setCampCoords(cl, ps);
 		cl->timechecked = time;
 	} else {
-		// Now check if 15 seconds have passed since the 1st check, if so do a proximity check
-		// 45 seconds in total is plenty of time for a player to move an and not camp in the same area for too long
+		// if the client is still close to his previous coordinates.
 		if ((time - cl->timechecked) > 10000) {
 			cl->timechecked = time;
 			// 10 seconds have passed since the last check
 			if (checkCamperLocation(cl, ps, 400) == 1) {
 				// Client is still within his previous radius, 
 				if (cl->campcounter == 3) {
-					// If the client is dead
-					if (ps->pm_type != PM_NORMAL) {
-						cl->campcounter = 0;
-						return;
+					// If the client is dead	
+					if (ps->pm_type != PM_NORMAL) {	
+						cl->campcounter = 0;	
+						return;	
 					}
 					// punish now
 					acceleratedSlap(cl, ps);
 					acceleratedSlap(cl, ps);
 					acceleratedSlap(cl, ps);
 					acceleratedSlap(cl, ps);
-					
+					acceleratedSlap(cl, ps);
 					cl->campcounter = 0;
-					Cmd_ExecuteString(va("bigtext \"^5%s ^3was caught\n^1Camping!\"", cl->name));
+					Cmd_ExecuteString(va("bigtext \"^5%s ^3was caught ^1Camping\"", cl->name));
 				} else {
 					cl->campcounter++;
 				}
@@ -1608,8 +3100,184 @@ void checkCampers (client_t *cl) {
 	}
 }
 
-//==================================================================================
+char* getWeaponModName(int wpn) {
+	switch (wpn) {
+		case ARENA_BERETTA: {return "beretta";}
+		case ARENA_DEAGLE: {return "deagle";}
+		case ARENA_COLT: {return "colt";}
+		case ARENA_GLOCK: {return "glock";}
+		case ARENA_MAGNUM: {return "magnum";}
+		case ARENA_LR300: {return "lr";}
+		case ARENA_G36: {return "g36";}
+		case ARENA_AK103: {return "ak103";}
+		case ARENA_M4: {return "m4";}
+		case ARENA_NEGEV: {return "negev";}
+		case ARENA_HK69: {return "hk69";}
+		case ARENA_UMP45: {return "ump45";}
+		case ARENA_MAC11: {return "mac11";}
+		case ARENA_P90: {return "p90";}
+		case ARENA_MP5K: {return "mp5k";}
+		case ARENA_SPAS12: {return "spas12";}
+		case ARENA_BENELLI: {return "benelli";}
+		case ARENA_PSG1: {return "psg1";}
+		case ARENA_SR8: {return "sr8";}
+		case ARENA_FRF1: {return "frf1";}
+		
+		default: {return "";}
+	}
+}
 
+void giveMultiClientWeapon (client_t *client, client_t *client2) {
+	
+	if (client->weaponGiven && client2->weaponGiven) {
+		return;
+	}
+
+	const char *wpnModName = "";
+	const char *wpnModName2 = "";
+	int usePreference;
+
+	// first check if their preference matches
+	if (client->preference == client2->preference) {
+		usePreference = client->preference;
+	} else {
+
+		// get a random choice
+		srand(Com_Milliseconds());
+		int rnd = rand();
+		usePreference = (rnd > RAND_MAX/2) ? client->preference : client2->preference;
+	}
+
+	if (usePreference == ARENA_PRIMARY) {
+		wpnModName = getWeaponModName(client->primary);
+		wpnModName2 = getWeaponModName(client2->primary);
+	}
+	else if (usePreference == ARENA_SECONDARY) {
+		wpnModName = getWeaponModName(client->secondary);
+		wpnModName2 = getWeaponModName(client2->secondary);
+	}
+	else if (usePreference == ARENA_PISTOL) {
+		wpnModName = getWeaponModName(client->pistol);
+		wpnModName2 = getWeaponModName(client2->pistol);
+	}
+	else if (usePreference == ARENA_SNIPER) {
+		wpnModName = getWeaponModName(client->sniper);
+		wpnModName2 = getWeaponModName(client2->sniper);
+	}
+	else if (usePreference == ARENA_KNIFE) {
+		wpnModName = "knife";
+		wpnModName2 = "knife";
+	}
+	else if (usePreference == ARENA_GIB) {
+		wpnModName = "fstod";
+		wpnModName2 = "fstod";
+	}
+	else {
+		SV_SendServerCommand(client, "cchat \"\" \"^5[^3Arena^5] ^1Error: [GiveMultiWeapon Failed] ^3contact ^2donna30.\"");
+		SV_SendServerCommand(client2, "cchat \"\" \"^5[^3Arena^5] ^1Error: [GiveMultiWeapon Failed] ^3contact ^2donna30.\"");
+		return;
+	}
+
+	// Mark the weapons as given
+	client->weaponGiven = qtrue;
+	client2->weaponGiven = qtrue;
+
+	Cmd_ExecuteString(va("giveweapon %i %s", client->playernum, wpnModName));
+	Cmd_ExecuteString(va("set1v1wpn %i", client->playernum));
+	Cmd_ExecuteString(va("giveweapon %i %s", client2->playernum, wpnModName2));
+	Cmd_ExecuteString(va("set1v1wpn %i", client2->playernum));
+
+}
+
+void setClientAngles(client_t *cl, int p) {
+
+    sharedEntity_t	*ent;
+	playerState_t 	*ps;
+    int           	angle;
+	int				i;
+
+    vec3_t p1angles = { 0, 0, 0 };
+    vec3_t p2angles = { 0, 180, 0 };
+
+    
+    ps = SV_GameClientNum(cl - svs.clients);
+    ent = SV_GentityNum(cl->playernum);
+
+	if (p == 1) {
+    	for (i = 0; i < 3; i++) {
+    	    angle = ANGLE2SHORT(p1angles[i]);
+    	    ps->delta_angles[i] = angle - cl->lastUsercmd.angles[i];
+    	}
+    	ps->delta_angles[0] -= 2000;
+
+    	VectorCopy(p1angles, ent->s.angles);
+    	VectorCopy(ent->s.angles, ps->viewangles);
+	} else {
+    	for (i = 0; i < 3; i++) {
+    	    angle = ANGLE2SHORT(p2angles[i]);
+    	    ps->delta_angles[i] = angle - cl->lastUsercmd.angles[i];
+    	}
+    	ps->delta_angles[0] -= 2000;
+	
+    	VectorCopy(p2angles, ent->s.angles);
+    	VectorCopy(ent->s.angles, ps->viewangles);
+	}
+
+    // set the view angle
+
+}
+
+
+void check1v1Teleport ( void ) {
+	unsigned int time = Com_Milliseconds();
+	if ((time - sv.doTeleportTime) > 10000) {
+		// 10 seconds have passed since roundstart, teleport the clients to their arena
+		for (int i = 0; i < MAX_1V1_ARENAS; i++) {
+			if (sv.Arenas[i].population == 2) {
+				client_t *cl;
+				client_t *cl2;
+				cl = &svs.clients[sv.Arenas[i].player1num];
+				cl2 = &svs.clients[sv.Arenas[i].player2num];
+				playerState_t *ps;
+				playerState_t *ps2;
+				ps = SV_GameClientNum(cl - svs.clients);
+				ps2 = SV_GameClientNum(cl2 - svs.clients);
+				VectorCopy(sv.Arenas[i].spawn1, ps->origin);
+				VectorClear(ps->velocity);
+				VectorCopy(sv.Arenas[i].spawn2, ps2->origin);
+				VectorClear(ps2->velocity);
+				giveMultiClientWeapon(cl, cl2);
+				setClientAngles(cl, 1);
+				setClientAngles(cl2, 2);
+				MOD_AddHealth(cl, 100);
+				MOD_AddHealth(cl2, 100);
+				ps->stats[playerStatsOffsets[getVersion()][OFFSET_PS_STAMINA]] = ps->stats[playerStatsOffsets[getVersion()][OFFSET_PS_HEALTH]] * 300;
+				ps2->stats[playerStatsOffsets[getVersion()][OFFSET_PS_STAMINA]] = ps2->stats[playerStatsOffsets[getVersion()][OFFSET_PS_HEALTH]] * 300;
+			}
+		}
+		sv.doneTp = qtrue;
+	}
+}
+
+void checkDoSmite ( void ) {
+	unsigned int time = Com_Milliseconds();
+	if ((time - sv.doSmite) > 2000) {
+		// 2 seconds have passed since roundstart, do smite
+		SV_SendServerCommand(NULL, "cchat \"\" \"^5[^3Arena^5] ^2All Arenas are finished.\"");
+		SV_SendServerCommand(NULL, "cchat \"\" \"^5[^3Arena^5] ^1Smiting all players ^3to end this round.\"");
+		client_t *plyr;
+		int i;
+    	for (i = 0, plyr = svs.clients; i < sv_maxclients->integer; i++, plyr++) {
+			if (plyr->state < CS_CONNECTED) {
+    		    continue;
+    		}
+			Cmd_ExecuteString(va("smite %i", plyr->playernum));
+			Cmd_ExecuteString(va("setscore %i %i", plyr->playernum, plyr->arenaKills));
+			Cmd_ExecuteString(va("setdeaths %i %i", plyr->playernum, plyr->arenaDeaths));
+		}
+		sv.doneSmite = qtrue;
+	}
+}
 
 /*
 ==================
@@ -1621,6 +3289,7 @@ Also called by bot code
 void SV_ClientThink (client_t *cl, usercmd_t *cmd) {
 	playerState_t *ps;
 	cl->lastUsercmd = *cmd;
+	int i, j;
 
 	if ( cl->state != CS_ACTIVE ) {
 		return;		// may have been kicked during the last usercmd
@@ -1628,11 +3297,123 @@ void SV_ClientThink (client_t *cl, usercmd_t *cmd) {
 
 	ps = SV_GameClientNum(cl - svs.clients);
 
-	VM_Call( gvm, GAME_CLIENT_THINK, cl - svs.clients );
+	// attaching players
+	if (cl->isattached) {
+		teleportAttached(cl);
+	}
+
+	// Gunmoney related passive healing
+	if (cl->hasmedkit){
+		addMedkitHealth(cl);
+	}
+
+	// For the anti block
+	if (sv.checkGhostMode && sv_ghostOnRoundstart->integer) {
+		checkGhostMode();
+	}
+
+	// Levelsystem
+	if (cl->customname == qtrue){
+		updateClientName(cl);
+	}
+
+	// Spectator announcer
+	if (mod_jumpSpecAnnouncer->integer) {
+		// Future additional check: sv_gametype->integer == GT_JUMP
+		checkSpecClient(cl, ps);
+	}
+
+	if (mod_turnpikeTeleporter->integer && strstr(sv_mapname->string, "ut4_turnpike")) {
+		if (SV_CheckLocation(470, -1130, 32, 12, ps->clientNum)== 1){
+			// Inside wc
+			Cmd_ExecuteString(va("tp %i %i %i %i", ps->clientNum, 1619, -677, 357));
+			SV_SendServerCommand(cl, "cp \"^3You ^6found ^3a ^2Secret Teleporter!\n^3The exit is ^5in the corner.\"");
+		} 
+		if (SV_CheckLocation(1497, -746, 345, 12, ps->clientNum)== 1){
+			Cmd_ExecuteString(va("tp %i %i %i %i", ps->clientNum, 605, -1084, 32));
+		} 
+	}
+
+	// Turnpikeblocker
+	if (sv_TurnpikeBlocker->integer && sv.currplayers < 6 && (strstr(sv_mapname->string, "ut4_turnpike"))) {
+
+		SV_TurnpikeBlocker(128,-1645,28, 64, 128, -1782, 28); // Entrance into metro
+		SV_TurnpikeBlocker(961, -1773, 28, 64, 961, -1901, 28); // Office entrance van
+		SV_TurnpikeBlocker(1586, -894, 28, 64, 1580, -993, 30); // side entrance into Office
+		SV_TurnpikeBlocker(766, -720, 28, 64, 769, -599, 28); // main office entrance
+		SV_TurnpikeBlocker(194, -479, 28, 64, 83, -483, 28); // under window entrance
+		SV_TurnpikeBlocker(176, -956, 28, 64, 178, -1055, 28); // office metro entrance
+		SV_TurnpikeBlocker(0, -1298, 28, 64, 1.5, -1182, 28); // metro back1
+		SV_TurnpikeBlocker(-415, -1297, 28, 64, -425, -1185, 28); // metro back2
+		SV_TurnpikeBlocker(312, -497, 224, 64, 420, -496, 235); // window
+		SV_TurnpikeBlocker(1400, -1915, 56, 64, 1391, -2012, 28); // garage1
+		SV_TurnpikeBlocker(1239, -1918, 56, 64, 1230, -2023, 28); // garage 2
+		
+	}
+
+	if (cl->particlefx) {
+		MOD_SetExternalEvent(cl, 106, 1);
+	}
+
+	if (mod_1v1arena->integer && !sv.doneTp) {
+		check1v1Teleport();
+	}
+
+	if (mod_1v1arena->integer && !sv.doneSmite) {
+		checkDoSmite();
+	}
 
 	if (mod_punishCampers->integer) {
-	checkCampers(cl);
+		checkCampers(cl);
 	}
+
+	if(mod_disableScope->integer)
+	{
+		if(cl->cm.lastWeaponAfterScope != -1 )
+		{
+			ps->weapon = cl->cm.lastWeaponAfterScope;
+			cl->cm.lastWeaponAfterScope = -1;
+		}else
+		{
+			//24576 is the flag for zoom3 that include zoom1 and zoom2
+			if(cmd->buttons&24576 && ps->weaponstate==WEAPON_READY)
+			{
+				cl->cm.lastWeaponAfterScope = ps->weapon;
+				//Allways the change is with the weapon 15, but if the actual weapon is 15 we use the 14.
+				if(ps->weapon==15)
+					ps->weapon=14;
+				else
+					ps->weapon=15;
+			}
+		}
+	}
+
+
+    SV_GhostThink(cl);
+
+    if (mod_infiniteAmmo->integer) {
+        for (i = 0; i < MAX_POWERUPS; i++) {
+            cl->cm.powerups[i] = ps->powerups[i];
+        }
+    }
+
+    MOD_AutoHealth(cl);
+
+	VM_Call( gvm, GAME_CLIENT_THINK, cl - svs.clients );
+
+    if (mod_infiniteAmmo->integer) {
+        if (cl->cm.lastEventSequence < ps->eventSequence - MAX_PS_EVENTS) {
+            cl->cm.lastEventSequence = ps->eventSequence - MAX_PS_EVENTS;
+        }
+        for (j = cl->cm.lastEventSequence; j < ps->eventSequence; j++) {
+            if (ps->events[j & (MAX_PS_EVENTS - 1)] == EV_FIRE_WEAPON || ps->weaponstate == WEAPON_FIRING) {
+                for (i = 0; i < MAX_POWERUPS; i++) {
+                    ps->powerups[i] = cl->cm.powerups[i];
+                }
+            }
+        }
+        cl->cm.lastEventSequence = ps->eventSequence;
+    }
 }
 
 /*
@@ -1687,8 +3468,13 @@ static void SV_UserMove( client_t *cl, msg_t *msg, qboolean delta ) {
 		oldcmd = cmd;
 	}
 
-	// save time for ping calculation
-	cl->frames[ cl->messageAcknowledge & PACKET_MASK ].messageAcked = svs.time;
+    // save time for ping calculation
+    //cl->frames[ cl->messageAcknowledge & PACKET_MASK ].messageAcked = svs.time;
+
+    // Store the time of the first acknowledge, instead of the last. And use a time value not limited by sv_fps.
+    if ( cl->frames[ cl->messageAcknowledge & PACKET_MASK ].messageAcked == -1 ) {
+        cl->frames[ cl->messageAcknowledge & PACKET_MASK ].messageAcked = Sys_Milliseconds();
+    }
 
 	// TTimo
 	// catch the no-cp-yet situation before SV_ClientEnterWorld
@@ -1698,7 +3484,7 @@ static void SV_UserMove( client_t *cl, msg_t *msg, qboolean delta ) {
 		if (cl->state == CS_ACTIVE)
 		{
 			// we didn't get a cp yet, don't assume anything and just send the gamestate all over again
-			Com_DPrintf( "%s: didn't get cp command, resending gamestate\n", cl->name);
+			Com_DPrintf( "%s^7: didn't get cp command, resending gamestate\n", cl->name);
 			SV_SendClientGameState( cl );
 		}
 		return;
@@ -1806,13 +3592,13 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 	if ( serverId != sv.serverId && !*cl->downloadName && !strstr(cl->lastClientCommandString, "nextdl") ) {
 		if ( serverId >= sv.restartedServerId && serverId < sv.serverId ) { // TTimo - use a comparison here to catch multiple map_restart
 			// they just haven't caught the map_restart yet
-			Com_DPrintf("%s : ignoring pre map_restart / outdated client message\n", cl->name);
+			Com_DPrintf("%s ^7: ignoring pre map_restart / outdated client message\n", cl->name);
 			return;
 		}
 		// if we can tell that the client has dropped the last
 		// gamestate we sent them, resend it
 		if ( cl->messageAcknowledge > cl->gamestateMessageNum ) {
-			Com_DPrintf( "%s : dropped gamestate, resending\n", cl->name );
+			Com_DPrintf( "%s ^7: dropped gamestate, resending\n", cl->name );
 			SV_SendClientGameState( cl );
 		}
 		return;
@@ -1821,7 +3607,7 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 	// this client has acknowledged the new gamestate so it's
 	// safe to start sending it the real time again
 	if( cl->oldServerTime && serverId == sv.serverId ){
-		Com_DPrintf( "%s acknowledged gamestate\n", cl->name );
+		Com_DPrintf( "%s ^7acknowledged gamestate\n", cl->name );
 		cl->oldServerTime = 0;
 	}
 
