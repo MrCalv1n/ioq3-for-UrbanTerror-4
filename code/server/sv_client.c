@@ -3448,14 +3448,14 @@ void checkCampers(client_t *cl)
 	else
 	{
 		// if the client is still close to his previous coordinates.
-		if ((time - cl->timechecked) > 5000)
+		if ((time - cl->timechecked) > 3000)
 		{
 			cl->timechecked = time;
 			// 10 seconds have passed since the last check
 			if (checkCamperLocation(cl, ps, 400) == 1)
 			{
 				// Client is still within his previous radius,
-				if (cl->campcounter == 3)
+				if (cl->campcounter == 4)
 				{
 					// If the client is dead
 					if (ps->pm_type != PM_NORMAL)
