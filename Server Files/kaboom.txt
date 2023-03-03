@@ -1,0 +1,65 @@
+playsoundfile 0 /zsounds/kaboom.wav
+wait 1
+playsoundfile 1 /zsounds/kaboom.wav
+wait 1
+playsoundfile 2 /zsounds/kaboom.wav
+wait 1
+playsoundfile 3 /zsounds/kaboom.wav
+wait 1
+playsoundfile 4 /zsounds/kaboom.wav
+wait 1
+playsoundfile 5 /zsounds/kaboom.wav
+wait 1
+playsoundfile 6 /zsounds/kaboom.wav
+wait 1
+playsoundfile 7 /zsounds/kaboom.wav
+wait 1
+playsoundfile 8 /zsounds/kaboom.wav
+wait 1
+playsoundfile 9 /zsounds/kaboom.wav
+wait 1
+playsoundfile 10 /zsounds/kaboom.wav
+wait 1
+playsoundfile 11 /zsounds/kaboom.wav
+wait 1
+playsoundfile 12 /zsounds/kaboom.wav
+wait 1
+playsoundfile 13 /zsounds/kaboom.wav
+wait 1
+playsoundfile 14 /zsounds/kaboom.wav
+wait 1
+playsoundfile 15 /zsounds/kaboom.wav
+wait 1
+playsoundfile 16 /zsounds/kaboom.wav
+wait 1
+playsoundfile 17 /zsounds/kaboom.wav
+wait 1
+playsoundfile 18 /zsounds/kaboom.wav
+wait 1
+playsoundfile 19 /zsounds/kaboom.wav
+wait 1
+playsoundfile 20 /zsounds/kaboom.wav
+wait 1
+playsoundfile 21 /zsounds/kaboom.wav
+wait 1
+playsoundfile 22 /zsounds/kaboom.wav
+wait 1
+playsoundfile 23 /zsounds/kaboom.wav
+wait 1
+playsoundfile 24 /zsounds/kaboom.wav
+wait 1
+playsoundfile 25 /zsounds/kaboom.wav
+wait 1
+playsoundfile 26 /zsounds/kaboom.wav
+wait 1
+playsoundfile 27 /zsounds/kaboom.wav
+wait 1
+playsoundfile 28 /zsounds/kaboom.wav
+wait 1
+playsoundfile 29 /zsounds/kaboom.wav
+wait 1
+playsoundfile 30 /zsounds/kaboom.wav
+wait 1
+playsoundfile 31 /zsounds/kaboom.wav
+wait 1
+playsoundfile 32 /zsounds/kaboom.wav
