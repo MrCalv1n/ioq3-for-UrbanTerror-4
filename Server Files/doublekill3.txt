@@ -1,0 +1,65 @@
+playsoundfile 0 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 1 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 2 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 3 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 4 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 5 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 6 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 7 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 8 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 9 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 10 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 11 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 12 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 13 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 14 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 15 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 16 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 17 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 18 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 19 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 20 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 21 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 22 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 23 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 24 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 25 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 26 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 27 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 28 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 29 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 30 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 31 /zsounds/doublekill3.wav
+wait 1
+playsoundfile 32 /zsounds/doublekill3.wav

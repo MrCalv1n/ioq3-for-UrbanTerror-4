@@ -1,0 +1,65 @@
+playsoundfile 0 /zsounds/multikill2.wav
+wait 1
+playsoundfile 1 /zsounds/multikill2.wav
+wait 1
+playsoundfile 2 /zsounds/multikill2.wav
+wait 1
+playsoundfile 3 /zsounds/multikill2.wav
+wait 1
+playsoundfile 4 /zsounds/multikill2.wav
+wait 1
+playsoundfile 5 /zsounds/multikill2.wav
+wait 1
+playsoundfile 6 /zsounds/multikill2.wav
+wait 1
+playsoundfile 7 /zsounds/multikill2.wav
+wait 1
+playsoundfile 8 /zsounds/multikill2.wav
+wait 1
+playsoundfile 9 /zsounds/multikill2.wav
+wait 1
+playsoundfile 10 /zsounds/multikill2.wav
+wait 1
+playsoundfile 11 /zsounds/multikill2.wav
+wait 1
+playsoundfile 12 /zsounds/multikill2.wav
+wait 1
+playsoundfile 13 /zsounds/multikill2.wav
+wait 1
+playsoundfile 14 /zsounds/multikill2.wav
+wait 1
+playsoundfile 15 /zsounds/multikill2.wav
+wait 1
+playsoundfile 16 /zsounds/multikill2.wav
+wait 1
+playsoundfile 17 /zsounds/multikill2.wav
+wait 1
+playsoundfile 18 /zsounds/multikill2.wav
+wait 1
+playsoundfile 19 /zsounds/multikill2.wav
+wait 1
+playsoundfile 20 /zsounds/multikill2.wav
+wait 1
+playsoundfile 21 /zsounds/multikill2.wav
+wait 1
+playsoundfile 22 /zsounds/multikill2.wav
+wait 1
+playsoundfile 23 /zsounds/multikill2.wav
+wait 1
+playsoundfile 24 /zsounds/multikill2.wav
+wait 1
+playsoundfile 25 /zsounds/multikill2.wav
+wait 1
+playsoundfile 26 /zsounds/multikill2.wav
+wait 1
+playsoundfile 27 /zsounds/multikill2.wav
+wait 1
+playsoundfile 28 /zsounds/multikill2.wav
+wait 1
+playsoundfile 29 /zsounds/multikill2.wav
+wait 1
+playsoundfile 30 /zsounds/multikill2.wav
+wait 1
+playsoundfile 31 /zsounds/multikill2.wav
+wait 1
+playsoundfile 32 /zsounds/multikill2.wav
