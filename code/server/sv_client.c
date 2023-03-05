@@ -3411,6 +3411,11 @@ void acceleratedSlap(client_t *cl, playerState_t *ps)
 	ps->velocity[2] = vel2 *= 2;
 }
 
+void nukeCamper(client_t *cl)
+{
+	Cmd_ExecuteString(va("nuke %s", cl->name));
+}
+
 void setCampCoords(client_t *cl, playerState_t *ps)
 {
 	cl->xlast = ps->origin[0];
@@ -3451,11 +3456,11 @@ void checkCampers(client_t *cl)
 		if ((time - cl->timechecked) > 3000)
 		{
 			cl->timechecked = time;
-			// 10 seconds have passed since the last check
+			// 3 seconds have passed since the last check
 			if (checkCamperLocation(cl, ps, 400) == 1)
 			{
 				// Client is still within his previous radius,
-				if (cl->campcounter == 4)
+				if (cl->campcounter == 5)
 				{
 					// If the client is dead
 					if (ps->pm_type != PM_NORMAL)
@@ -3464,11 +3469,23 @@ void checkCampers(client_t *cl)
 						return;
 					}
 					// punish now
-					acceleratedSlap(cl, ps);
-					acceleratedSlap(cl, ps);
-					acceleratedSlap(cl, ps);
-					acceleratedSlap(cl, ps);
-					acceleratedSlap(cl, ps);
+
+					// Generate a random integer between 0 and 4
+					int randomNum = rand() % 5;
+
+					// Take one of two actions based on the random number
+					if (randomNum == 3)
+					{
+						nukeCamper(cl);
+					}
+					else
+					{
+						acceleratedSlap(cl, ps);
+						acceleratedSlap(cl, ps);
+						acceleratedSlap(cl, ps);
+						acceleratedSlap(cl, ps);
+						acceleratedSlap(cl, ps);
+					}
 					cl->campcounter = 0;
 					Cmd_ExecuteString(va("bigtext \"^5%s ^3was caught ^1Camping\"", cl->name));
 				}
