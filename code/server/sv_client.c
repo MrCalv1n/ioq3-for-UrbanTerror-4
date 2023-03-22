@@ -3460,7 +3460,7 @@ void checkCampers(client_t *cl)
 			if (checkCamperLocation(cl, ps, 400) == 1)
 			{
 				// Client is still within his previous radius,
-				if (cl->campcounter == 5)
+				if (cl->campcounter == 7)
 				{
 					// If the client is dead
 					if (ps->pm_type != PM_NORMAL)

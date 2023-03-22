@@ -1223,7 +1223,7 @@ void SV_Init(void)
 	// TitanMod cvars
 	mod_infiniteStamina = Cvar_Get("mod_infiniteStamina", "0", CVAR_ARCHIVE);
 	mod_infiniteWallJumps = Cvar_Get("mod_infiniteWallJumps", "0", CVAR_ARCHIVE);
-	mod_nofallDamage = Cvar_Get("mod_nofallDamage", "1", CVAR_ARCHIVE);
+	mod_nofallDamage = Cvar_Get("mod_nofallDamage", "0", CVAR_ARCHIVE);
 
 	mod_colourNames = Cvar_Get("mod_colourNames", "1", CVAR_ARCHIVE);
 
