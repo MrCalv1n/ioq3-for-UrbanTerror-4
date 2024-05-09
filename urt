@@ -12,7 +12,7 @@ fi
 
 ## run the UrT server
 echo "===== Starting UrT server ======"
-exec /UrbanTerror43/titan-ded.x86_64 \
+exec /UrbanTerror43/Quake3-UrT-ded.x86_64 \
 	+set fs_game q3ut4 \
 	+set fs_homepath /server/ \
 	+set dedicated 2 \
