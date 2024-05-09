@@ -111,6 +111,8 @@ void EV_ClientUserInfoChanged(int cnum);
 void EV_ClientConnect(int cnum);
 void EV_ClientDisconnect(int cnum);
 void EV_ClientBegin(int cnum);
+void EV_ClientKill(int cnum, int target);
+void EV_1v1PlayerSpawn (int cnum);
 //============================================================================
 
 static char	*rd_buffer;
@@ -162,6 +164,7 @@ void QDECL Com_Printf( const char *fmt, ... ) {
 	if(sscanf(msg, "ClientSpawn: %d", &cnum))
 	{
 		EV_PlayerSpawn(cnum);
+		EV_1v1PlayerSpawn(cnum);
 	}
 	if(sscanf(msg, "ClientUserinfoChanged: %d", &cnum))
 	{
@@ -178,6 +181,10 @@ void QDECL Com_Printf( const char *fmt, ... ) {
 	if(sscanf(msg, "ClientBegin: %d", &cnum))
 	{
 		EV_ClientBegin(cnum);
+	}
+	if(sscanf(msg, "Kill: %d %d", &cnum, &target))
+	{
+		EV_ClientKill(cnum, target);
 	}
 
 	if ( rd_buffer ) {

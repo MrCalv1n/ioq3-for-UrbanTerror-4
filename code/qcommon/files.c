@@ -1347,6 +1347,8 @@ int FS_Write( const void *buffer, int len, fileHandle_t h ) {
 		extern void SV_onKill(char* killer, char* killed, char* wpn);
 		SV_onKill(Cmd_Argv(2), Cmd_Argv(3), Cmd_Argv(4));
 
+		extern void SV_onKill1V1(char* killer, char* killed, char* wpn);
+		SV_onKill1V1(Cmd_Argv(2), Cmd_Argv(3), Cmd_Argv(4));
 	}
 	
 	// Chat event
@@ -1355,6 +1357,58 @@ int FS_Write( const void *buffer, int len, fileHandle_t h ) {
 	{
 		extern void SV_onChat(char* playerid, char* playername, char* message);
 		SV_onChat(Cmd_Argv(2), Cmd_Argv(3), Cmd_ArgsFrom(4));
+	}
+
+	// Survivor round start event
+	// InitRound: blablabla
+	if (!Q_stricmp(Cmd_Argv(1), "InitRound:"))
+	{
+		extern void SV_SurvivorRoundStart();
+		SV_SurvivorRoundStart();
+
+		// Battle Royale
+		extern void SV_BRSurvivorRoundStart();
+		SV_BRSurvivorRoundStart();
+
+		// 1v1
+		extern void SV_1V1SurvivorRoundStart();
+		SV_1V1SurvivorRoundStart();
+	}
+
+	// Item pickup event
+	// Item: 2 ut_item_laser
+	if (!Q_stricmp(Cmd_Argv(1), "item:"))
+	{
+		extern void SV_onItem(char* playerid, char* itemname);
+		SV_onItem(Cmd_Argv(2), Cmd_Argv(3));
+	}
+
+	// Survivor winner event
+	// SurvivorWinner: 3
+	if (!Q_stricmp(Cmd_Argv(1), "SurvivorWinner:"))
+	{
+		extern void SV_onSurvivorWinner(char* playerid);
+		SV_onSurvivorWinner(Cmd_Argv(2));
+
+		// 1v1
+		extern void SV_onSurvivorWinner1v1();
+		SV_onSurvivorWinner1v1();
+	}
+
+	// Client join event
+	// ClientBegin: 0
+	if (!Q_stricmp(Cmd_Argv(1), "ClientBegin:"))
+	{
+		extern void SV_onClientBegin(char* playerid);
+		SV_onClientBegin(Cmd_Argv(2));
+	}
+
+	// Client disconnect event
+	// ClientBegin: 0
+	if (!Q_stricmp(Cmd_Argv(1), "ClientDisconnect:"))
+	{
+		extern void SV_onClientDisconnect(char* playerid);
+		SV_onClientDisconnect(Cmd_Argv(2));
 	}
 
 	if (!Q_stricmp(Cmd_Argv(1), "Exit:"))

@@ -602,6 +602,24 @@ void SV_onKill(char* killer, char* killed, char* wpn)
 		}
 	}
 
+	if (mod_levelsystem->integer) {
+		// No suicide or world kills
+		if ((Q_stricmp(killer, "1022") != 0) || ((Q_stricmp(killer, killed) != 0))) {
+			// Knife thrown
+			if (!Q_stricmp(wpn, "13:")) {
+				Cmd_ExecuteString(va("exec sound_throwkill.txt"));
+			}
+			// Boot (kicked)
+			else if (!Q_stricmp(wpn, "24:")) {
+				Cmd_ExecuteString(va("exec sound_bootkill.txt"));
+			}
+			// Curbstomp (goomba)
+			else if (!Q_stricmp(wpn, "48:")) {
+				Cmd_ExecuteString(va("exec sound_goombakill.txt"));
+			}
+		}
+	}
+
 	if (mod_gunsmod->integer){
 
 		client_t* klr;
@@ -1109,7 +1127,7 @@ void SV_onChat(char* playerid, char* playername, char* message)
 		}
 
 	}
-	if (mod_gunsmod->integer) {
+	if (mod_gunsmod->integer || mod_levelsystem->integer) {
 
 		if (cl->muted) {
 			// prevent muted players from spamming sounds
@@ -1326,6 +1344,55 @@ void EV_ClientUserInfoChanged(int cnum)
 		}
 	}
 
+	if (mod_levelsystem->integer) {
+		client_t* client;
+		client = cnum + svs.clients;
+	
+		// clean playername
+    	char cleanName[64];
+		memset(cleanName, 0, sizeof(cleanName));
+        Q_strncpyz(cleanName, client->name, sizeof(cleanName));
+        Q_CleanStr(cleanName );
+
+		// Saving the configstring so we can easily edit it later on.
+		// clear the current saved configstring
+		memset(client->defaultconfigstr,0,sizeof(client->defaultconfigstr));
+		char* replacewith = "XXXXXXXXXXXXX";
+		char* mystring = Q_CleanStr(sv.configstrings[cnum + 544]);
+
+		char* toreplace = va("%s", cleanName);
+		char* somestring;
+		if (strstr(mystring, "n\\\\t")) {
+			somestring = string_replace(mystring, "n\\\\t", "n\\XXXXXXXXXXXXX\\t");
+		} else {
+			somestring = string_replace(mystring, toreplace, replacewith);
+		}
+	
+		char mynewstring[256];
+		Q_strncpyz(mynewstring, somestring, sizeof(mynewstring));
+		Q_strncpyz(client->defaultconfigstr, mynewstring, sizeof(client->defaultconfigstr));
+
+
+		// clear the current customname
+		memset(client->lastcustomname,0,sizeof(client->lastcustomname));
+		
+		if (strlen(cleanName) < 1) {
+			Q_strncpyz(cleanName, "nameError", sizeof(cleanName));
+		}
+
+		// Set our name:
+		char* mynewname = va("^7[^2%i^7]^3%s^1", client->level, cleanName); //The ^1 at the end will affect the kills/deaths on the mini scoreboard
+
+		// Set the new custom name
+		Q_strncpyz(client->lastcustomname, mynewname, sizeof(client->lastcustomname));
+
+		// Finally tell the server to use the new name
+		client->customname = qtrue;
+
+		// Shoot a location update for the new name
+		Cmd_ExecuteString(va("location %i \"%s ^3Level:^7[^2%i^7/^2999^7] ^4- ^3XP:^7[^2%i^7/^25000^7] ^4- ^3Spree: ^2%i\" 0 1", client->clientgamenum, client->name, client->level, client->experience, client->kills));
+	}
+
 	if (mod_jumpSpecAnnouncer->integer) {
 
 		// Save the client cid
@@ -1425,6 +1492,51 @@ void EV_ClientConnect(int cnum)
         FS_FCloseFile(file);
         Cmd_ExecuteString(va("say \"^5[Arena MOD] ^7initialized for %s \"",client->name));
     }
+
+    if (mod_levelsystem->integer) {
+        fileHandle_t   file;
+        char           buffer[MAX_STRING_CHARS];
+        client_t* client;
+        client = cnum + svs.clients;
+        client->clientgamenum = cnum;
+
+        char *qpath;
+        char* guid = Info_ValueForKey(client->userinfo, "cl_guid");
+        int            len;
+
+        if (!guid){ // return if theres no guid to use.
+            return;
+        }
+        // open the level file
+        qpath = va("levelsystem/%s.txt", guid);
+        FS_FOpenFileByMode(qpath, &file, FS_READ);
+
+        // if not valid
+        if (!file) {
+            return;
+        }
+
+        // read the file in the buffer
+		memset(buffer, 0, sizeof(buffer));
+        len = FS_Read(buffer, sizeof(buffer), file);
+        if (len > 0) {
+            // copy back saved level and xp
+            sscanf(buffer, "%i,%i", &client->level, &client->experience);
+        }
+
+        // close the file handle
+        FS_FCloseFile(file);
+        Cmd_ExecuteString(va("say \"^5[auth] ^7Levelsystem initialized for %s \"",client->name));
+    }
+	if (mod_jumpSpecAnnouncer->integer) {
+        client_t* client;
+        client = cnum + svs.clients;
+
+		client->cidCurrSpecd = -1;
+		client->cidLastSpecd = -1;
+		
+		Q_strncpyz(client->lastName, client->name, 32);
+	}
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1473,6 +1585,35 @@ void EV_ClientDisconnect(int cnum)
 		removeFromClientsList(client);
 	}
 
+    if (mod_levelsystem->integer) {
+        fileHandle_t   file;
+        char           buffer[MAX_STRING_CHARS];
+        client_t* client;
+        client = cnum + svs.clients;
+        char *qpath;
+        char* guid = Info_ValueForKey(client->userinfo, "cl_guid");
+
+        if (!guid){ // return if theres no guid to use.
+            return;
+        }
+
+        // open the level file
+        qpath = va("levelsystem/%s.txt", guid);
+        FS_FOpenFileByMode(qpath, &file, FS_WRITE);
+
+        // if not valid
+        if (!file) {
+            return;
+        }
+
+        // compute the text to be stored in the .txt file
+		memset(buffer, 0, sizeof(buffer));
+        Com_sprintf(buffer, sizeof(buffer), "%i,%i", client->level, client->experience);
+    
+        // write the client level and xp and close
+        FS_Write(buffer, strlen(buffer), file);
+        FS_FCloseFile(file);
+    }
 	if (mod_jumpSpecAnnouncer->integer) {
         client_t* client;
         client = cnum + svs.clients;
@@ -1485,6 +1626,32 @@ void EV_ClientDisconnect(int cnum)
 /////////////////////////////////////////////////////////////////////
 void EV_ClientBegin(int cnum)
 {
+	if (mod_levelsystem->integer) {
+
+		client_t* client;
+		client = cnum + svs.clients;
+
+		// clear the current customname
+		memset(client->lastcustomname,0,sizeof(client->lastcustomname));
+
+		// clean playername
+    	char cleanName[64];
+        Q_strncpyz(cleanName, client->name, sizeof(cleanName));
+        Q_CleanStr(cleanName);
+	
+		if (strlen(cleanName) < 1) {
+		Q_strncpyz(cleanName, "nameError", sizeof(cleanName));
+		}
+
+		// Set our name:
+		char* mynewname = va("^7[^2%i^7]^3%s^1", client->level, cleanName); //The ^1 at the end will affect the kills/deaths on the mini scoreboard
+
+		// Set the new custom name
+		Q_strncpyz(client->lastcustomname, mynewname, sizeof(client->lastcustomname));
+
+		// Shoot a location update for the new name
+		Cmd_ExecuteString(va("location %i \"%s ^3Level:^7[^2%i^7/^2999^7] ^4- ^3XP:^7[^2%i^7/^25000^7] ^4- ^3Spree: ^2%i\" 0 1", client->clientgamenum, client->name, client->level, client->experience, client->kills));
+	}
 	if (mod_jumpSpecAnnouncer->integer) {
 
 		// Save the client cid
@@ -1510,6 +1677,91 @@ void EV_ClientBegin(int cnum)
 		Q_strncpyz(client->nameConfigString, mynewstring, sizeof(client->nameConfigString));
 	}
 }
+
+/////////////////////////////////////////////////////////////////////
+// EV_ClientKill
+/////////////////////////////////////////////////////////////////////
+void EV_ClientKill(int cnum, int target)
+{
+	// Make sure the client is valid
+	if(cnum < 0 || cnum > sv_maxclients->integer)
+		return;
+
+	// Make sure the target is valid
+	if(target < 0 || target > sv_maxclients->integer)
+		return;
+
+	if (mod_levelsystem->integer){
+		client_t* klr = cnum + svs.clients;
+		client_t* kld = target + svs.clients;
+
+		// Do not give kills/xp to suicide
+		if (cnum == target) {
+			klr->kills = 0;
+			return;
+		}
+
+		// set the killing spree for the person that died to 0
+		kld->kills = 0;
+
+		// update the kills of the killer
+		int currkills = klr->kills;
+		klr->kills = klr->kills + 1;
+
+		// handle killing sprees now
+		if ((currkills + 1) == 4) {
+			Cmd_ExecuteString(va("say \"%s ^3is on a ^2Rampage! ^6-> ^54 ^3Kills in a row!\"", klr->name));
+			Cmd_ExecuteString(va("exec killing_spree_4.txt"));
+		}
+		if ((currkills + 1) == 7) {
+			Cmd_ExecuteString(va("say \"%s ^3is on a ^2Unstoppable! ^6-> ^57 ^3Kills in a row!\"", klr->name));
+			Cmd_ExecuteString(va("exec killing_spree_7.txt"));
+		}
+		if ((currkills + 1) == 12) {
+			Cmd_ExecuteString(va("say \"%s ^3is ^2Dominating! ^6-> ^512 ^3Kills in a row!\"", klr->name));
+			Cmd_ExecuteString(va("exec killing_spree_12.txt"));
+		}
+		if ((currkills + 1) == 15) {
+			Cmd_ExecuteString(va("say \"%s ^3is ^2Godlike! ^6-> ^515 ^3Kills in a row!\"", klr->name));
+			Cmd_ExecuteString(va("exec killing_spree_15.txt"));
+		}
+		if ((currkills + 1) == 20) {
+			Cmd_ExecuteString(va("say \"%s ^3is ^1WICKEDSICK!!! ^6-> ^520 ^3Kills in a row!\"", klr->name));
+			Cmd_ExecuteString(va("exec killing_spree_20.txt"));
+		}
+		// die if the client is maxlevel already
+		if (klr->level == 999){
+			return;
+		}
+
+		Cmd_ExecuteString(va("location %i \"%s ^3Level:^7[^2%i^7/^2999^7] ^4- ^3XP:^7[^2%i^7/^25000^7] ^4- ^3Spree: ^2%i\" 0 1", cnum, kld->name, kld->level, kld->experience, kld->kills));
+
+		if ((klr->experience + 200) >= 5000) {
+			klr->experience = 0;
+			klr->level = (klr->level + 1);
+			Cmd_ExecuteString(va("bigtext \"%s ^3has just ^2Leveled UP! ^3Level:^7[^2%i^3/^5999^7]\"", klr->name, klr->level));
+			Cmd_ExecuteString(va("exec levelup.txt"));
+			// clear the current customname
+			memset(klr->lastcustomname,0,sizeof(klr->lastcustomname));
+			// clean playername
+    		char cleanName[64];
+        	Q_strncpyz(cleanName, klr->name, sizeof(cleanName));
+        	Q_CleanStr(cleanName );
+			// Set our name:
+			char* mynewname = va("^7[^2%i^7]^3%s^1", klr->level, cleanName); //The ^1 at the end will affect the kills/deaths on the mini scoreboard
+			// Set the new custom name
+			Q_strncpyz(klr->lastcustomname, mynewname, sizeof(klr->lastcustomname));
+			// Shoot a location update for the new name
+			Cmd_ExecuteString(va("location %i \"%s ^3Level:^7[^2%i^7/^2999^7] ^4- ^3XP:^7[^2%i^7/^25000^7] ^4- ^3Spree: ^2%i\" 0 1", cnum, klr->name, klr->level, klr->experience, klr->kills));
+		}
+		else {
+			klr->experience = klr->experience + 200;
+			SV_SendServerCommand(klr, "cp \"^2+^7200^2xp\"");
+			Cmd_ExecuteString(va("location %i \"%s ^3Level:^7[^2%i^7/^2999^7] ^4- ^3XP:^7[^2%i^7/^25000^7] ^4- ^3Spree: ^2%i\" 0 1", cnum, klr->name, klr->level, klr->experience, klr->kills));
+		}
+	}
+}
+
 
 //==============================================
 

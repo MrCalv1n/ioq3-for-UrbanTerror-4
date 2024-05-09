@@ -1592,6 +1592,113 @@ static void SV_CompleteMapName( char *args, int argNum ) {
 */
 
 /////////////////////////////////////////////////////////////////////
+// SV_SetScore_f
+/////////////////////////////////////////////////////////////////////
+static void SV_SetScore_f(void) {
+
+	client_t      *cl;
+	playerState_t *ps;
+	int           value, i;
+
+	if (!com_sv_running->integer) {
+		Com_Printf("Server is not running\n");
+		return;
+	}
+
+	if(Cmd_Argc() < 3) {
+        Com_Printf("Usage: setscore <player> <value>\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(cl == NULL)
+		return;
+
+	if (sscanf(Cmd_Argv(2), "%d", &value) == 0) {
+		Com_Printf("Invalid value.\n");
+		return;
+	}
+
+	ps = SV_GameClientNum(cl - svs.clients);
+	ps->persistant[PERS_SCORE] = value;
+	for(i = 0, cl = svs.clients; i < sv_maxclients->integer; i++, cl++)	{
+		if(cl->state == CS_ACTIVE)
+			SV_ExecuteClientCommand(cl, "score", qtrue);
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_SetDeaths_f
+/////////////////////////////////////////////////////////////////////
+static void SV_SetDeaths_f(void) {
+
+	client_t      *cl;
+	playerState_t *ps;
+	int           value, i;
+
+	if (!com_sv_running->integer) {
+		Com_Printf("Server is not running\n");
+		return;
+	}
+
+	if(Cmd_Argc() < 3) {
+		 Com_Printf("Usage: setdeaths <player> <value>\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(cl == NULL)
+		return;
+
+	if (sscanf(Cmd_Argv(2), "%d", &value) == 0) {
+		Com_Printf("Invalid value.\n");
+		return;
+	}
+
+	ps = SV_GameClientNum(cl - svs.clients);
+	ps->persistant[PERS_KILLED] = value;
+	for(i = 0, cl = svs.clients; i < sv_maxclients->integer; i++, cl++)	{
+		if(cl->state == CS_ACTIVE)
+			SV_ExecuteClientCommand(cl, "score", qtrue);
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Invisible_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Invisible_f(void) {
+
+	client_t       *cl;
+	sharedEntity_t *e;
+
+	if (!com_sv_running->integer) {
+		Com_Printf("Server is not running\n");
+		return;
+	}
+
+	if (Cmd_Argc() < 2) {
+		Com_Printf("Usage: invisible <player>\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if (!cl) {
+		return;
+	}
+
+	e = SV_GentityNum(cl - svs.clients);
+	e->r.svFlags ^= SVF_NOCLIENT;
+
+	if (e->r.svFlags & SVF_NOCLIENT) {
+		Com_Printf("Player %s ^7Invisible.\n", cl->name);
+        SV_SendServerCommand(cl, "cchat \"\" \"%s^7Your invisibility mode turned: [^2ON^7]\"", sv_tellprefix->string);
+	} else {
+		Com_Printf("Player %s ^7Visible.\n", cl->name);
+        SV_SendServerCommand(cl, "cchat \"\" \"%s^7Your invisibility mode turned: [^1OFF^7]\"", sv_tellprefix->string);
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
 // SV_PlaySoundFile_f
 /////////////////////////////////////////////////////////////////////
 static void SV_PlaySoundFile_f (void)
@@ -1653,6 +1760,588 @@ static void SV_PlaySound_f (void)
 }
 
 /////////////////////////////////////////////////////////////////////
+// SV_GiveWeapon_f
+/////////////////////////////////////////////////////////////////////
+static void SV_GiveWeapon_f (void) {
+
+	client_t      *cl;
+	weapon_t      wp = 0;
+	playerState_t *ps;
+	int targetweapon;
+
+	if(!com_sv_running->integer) {
+		Com_Printf("Server is not running\n");
+		return;
+	}
+
+	if(Cmd_Argc() < 3) {
+		Com_Printf("Usage: giveweapon <player> <weapon> [ [bullets] [clips] ]\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if (!cl) {
+        return;
+    }
+
+	wp = SV_Char2Weapon(Cmd_Argv(2));
+
+	if(wp == 0) {
+		Com_Printf("Weapon not found\n");
+		return;
+	}
+
+	ps = SV_GameClientNum(cl - svs.clients);
+
+	//If the player have the weapon only add the clips.
+	targetweapon = SV_FirstMatchFor(ps, wp);
+
+    if(Cmd_Argc() <= 4) {
+        if (targetweapon == -1) {
+            SV_GiveWeapon(ps, wp);
+        } else {
+            SV_GiveClipsAW(ps, *(int*)QVM_clips(wp)+UT_WEAPON_GETCLIPS(targetweapon), targetweapon);
+        }
+    }
+    else if(Cmd_Argc()  == 5)
+    {
+        if(targetweapon == -1)
+        {
+            SV_GiveWeaponCB(ps, wp, atoi(Cmd_Argv(3)), atoi(Cmd_Argv(4)));
+        }else
+        {
+            SV_GiveBulletsAW(ps, atoi(Cmd_Argv(3))+UT_WEAPON_GETBULLETS(targetweapon), targetweapon);
+            SV_GiveClipsAW(ps, atoi(Cmd_Argv(4))+UT_WEAPON_GETCLIPS(targetweapon), targetweapon);
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_GiveItem_f
+/////////////////////////////////////////////////////////////////////
+static void SV_GiveItem_f (void) {
+
+	client_t      *cl;
+	utItemID_t      item = 0;
+	playerState_t *ps;
+
+	if(!com_sv_running->integer) {
+		Com_Printf("Server is not running\n");
+		return;
+	}
+
+	if(Cmd_Argc() < 3) {
+		Com_Printf("Usage: giveitem <player> <item>\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if (!cl) {
+        return;
+    }
+
+	item = SV_Char2Item(Cmd_Argv(2));
+
+	if(item == 0) {
+		Com_Printf("Item not found\n");
+		return;
+	}
+
+	ps = SV_GameClientNum(cl - svs.clients);
+    if(utPSFirstMath(ps,item) == -1)
+	    utPSGiveItem(ps, item);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_RemoveWeapon_f
+/////////////////////////////////////////////////////////////////////
+static void SV_RemoveWeapon_f (void) {
+
+	client_t      *cl;
+	weapon_t      wp = 0;
+	playerState_t *ps;
+
+	if(!com_sv_running->integer) {
+		Com_Printf("Server is not running\n");
+		return;
+	}
+
+	if(Cmd_Argc() < 3) {
+		Com_Printf("Usage: removeweapon <player> <weapon>\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        return;
+    }
+
+	wp = SV_Char2Weapon(Cmd_Argv(2));
+
+	if(wp == 0) {
+		Com_Printf("Weapon not found\n");
+		return;
+	}
+
+	ps = SV_GameClientNum(cl - svs.clients);
+
+	SV_RemoveWeapon(ps, wp);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_RemoveItem_f
+/////////////////////////////////////////////////////////////////////
+static void SV_RemoveItem_f (void) {
+
+	client_t      *cl;
+	utItemID_t      item = 0;
+	playerState_t *ps;
+
+	if(!com_sv_running->integer) {
+		Com_Printf("Server is not running\n");
+		return;
+	}
+
+	if(Cmd_Argc() < 3) {
+		Com_Printf("Usage: removeitem <player> <item>\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if (!cl) {
+        return;
+    }
+
+	item = SV_Char2Item(Cmd_Argv(2));
+
+    if(item == 0) {
+		Com_Printf("Item not found\n");
+		return;
+	}
+
+	ps = SV_GameClientNum(cl - svs.clients);
+
+	utPSRemoveItem(ps, item);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_GiveClips_f
+/////////////////////////////////////////////////////////////////////
+static void SV_GiveClips_f (void)
+{
+	client_t *cl;
+	playerState_t *ps;
+	int value;
+	int toweapon;
+
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running\n");
+		return;
+	}
+	if(Cmd_Argc() < 3)
+	{
+		Com_Printf("Usage: giveclips <player> <value> [weapon]\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(!cl)
+		return;
+	if (sscanf(Cmd_Argv(2), "%d", &value) == 0) {
+		Com_Printf("Invalid value.\n");
+		return;
+	}
+
+	ps = SV_GameClientNum(cl - svs.clients);
+
+    //if contain weapon
+    if(Cmd_Argc() > 3)
+    {
+        toweapon = SV_FirstMatchFor(ps, SV_Char2Weapon(Cmd_Argv(3)));
+        if(toweapon == -1)
+        {
+            Com_Printf("Can't find the weapon\n");
+            return;
+        }
+    }else
+    {
+        toweapon = ps->weapon;
+    }
+
+	SV_GiveClipsAW(ps, value, toweapon);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_GiveBullets_f
+/////////////////////////////////////////////////////////////////////
+static void SV_GiveBullets_f (void)
+{
+	client_t *cl;
+	playerState_t *ps;
+	int value;
+    int toweapon;
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running\n");
+		return;
+	}
+	if(Cmd_Argc() < 3)
+	{
+		Com_Printf("Usage: givebullets <player> <value> [weapon]\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(!cl)
+		return;
+	if (sscanf(Cmd_Argv(2), "%d", &value) == 0) {
+		Com_Printf("Invalid value.\n");
+		return;
+	}
+
+	ps = SV_GameClientNum(cl - svs.clients);
+
+    //if contain weapon
+    if(Cmd_Argc() > 3)
+    {
+        toweapon = SV_FirstMatchFor(ps, SV_Char2Weapon(Cmd_Argv(3)));
+        if(toweapon == -1)
+        {
+            Com_Printf("Can't find the weapon\n");
+            return;
+        }
+    }else
+    {
+        toweapon = ps->weapon;
+    }
+
+	SV_GiveBulletsAW(ps, value, toweapon);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_SetClips_f
+/////////////////////////////////////////////////////////////////////
+static void SV_SetClips_f (void)
+{
+	client_t *cl;
+	playerState_t *ps;
+	int value;
+	int toweapon;
+
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running\n");
+		return;
+	}
+	if(Cmd_Argc() < 3)
+	{
+		Com_Printf("Usage: setclips <player> <value> [weapon]\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(!cl)
+		return;
+	if (sscanf(Cmd_Argv(2), "%d", &value) == 0) {
+		Com_Printf("Invalid value.\n");
+		return;
+	}
+
+	ps = SV_GameClientNum(cl - svs.clients);
+
+    //if contain weapon
+    if(Cmd_Argc() > 3)
+    {
+        toweapon = SV_FirstMatchFor(ps, SV_Char2Weapon(Cmd_Argv(3)));
+        if(toweapon == -1)
+        {
+            Com_Printf("Can't find the weapon\n");
+            return;
+        }
+    }else
+    {
+        toweapon = ps->weapon;
+    }
+
+	SV_SetClipsAW(ps, value, toweapon);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_SetBullets_f
+/////////////////////////////////////////////////////////////////////
+static void SV_SetBullets_f (void)
+{
+	client_t *cl;
+	playerState_t *ps;
+	int value;
+	int toweapon;
+
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running\n");
+		return;
+	}
+	if(Cmd_Argc() < 3)
+	{
+		Com_Printf("Usage: setbullets <player> <value> [weapon]\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(!cl)
+		return;
+	if (sscanf(Cmd_Argv(2), "%d", &value) == 0) {
+		Com_Printf("Invalid value.\n");
+		return;
+	}
+
+	ps = SV_GameClientNum(cl - svs.clients);
+
+    //if contain weapon
+    if(Cmd_Argc() > 3)
+    {
+        toweapon = SV_FirstMatchFor(ps, SV_Char2Weapon(Cmd_Argv(3)));
+        if(toweapon == -1)
+        {
+            Com_Printf("Can't find the weapon\n");
+            return;
+        }
+    }else
+    {
+        toweapon = ps->weapon;
+    }
+
+	SV_SetBulletsAW(ps, value, toweapon);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Teleport_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Teleport_f(void) {
+
+    client_t      *cl;
+    playerState_t *ps;
+
+    // make sure server is running
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running.\n");
+        return;
+    }
+
+    // check for correct number of arguments
+    if (Cmd_Argc() != 2 && Cmd_Argc() != 3 && Cmd_Argc() != 5) {
+        Com_Printf("Usage: teleport <player1> <player2>\n"
+                   "       teleport <player> <x> <y> <z>\n");
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        return;
+    }
+
+    ps = SV_GameClientNum(cl - svs.clients);
+
+    // print a player's position
+    if (Cmd_Argc() == 2) {
+        Com_Printf("Position of %s^7: (x: %f, y: %f, z: %f)\n", cl->name, ps->origin[0], ps->origin[1], ps->origin[2]);
+        return;
+    }
+
+    // teleport a player to another player's position
+    if (Cmd_Argc() == 3) {
+        client_t      *cl_src;
+        playerState_t *ps_src;
+
+        Cmd_TokenizeString(Cmd_Args());
+
+        cl_src = SV_GetPlayerByHandle();
+        // return if no client2 or if both players are the same
+        if (!cl_src || cl_src == cl) {
+            return;
+        }
+
+        ps_src = SV_GameClientNum(cl_src - svs.clients);
+        VectorCopy(ps_src->origin, ps->origin);
+
+        Com_Printf("Teleported %s ^7to %s\n", cl->name, cl_src->name);
+        SV_SendServerCommand(cl, "cchat \"\" \"%s^7You have been ^2teleported ^7to: %s\"", sv_tellprefix->string, cl_src->colourName);
+        SV_SendServerCommand(cl_src, "cchat \"\" \"%s^7Player %s ^7has been ^2teleported ^7to you!\"", sv_tellprefix->string, cl->colourName);
+
+    // teleport a player to the specified x, y, z coordinates
+    } else {
+        int i;
+        for (i = 0; i < 3; ++i) {
+            ps->origin[i] = atof(Cmd_Argv(i + 2));
+        }
+    }
+    VectorClear(ps->velocity);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Switch_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Switch_f(void) {
+
+    client_t      *cl, *cl2;
+    playerState_t *ps, *ps2;
+
+    // make sure server is running
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running.\n");
+        return;
+    }
+
+    // check for correct number of arguments
+    if (Cmd_Argc() != 3) {
+        Com_Printf("Usage: switch <player1> <player2>\n");
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        return;
+    }
+    ps = SV_GameClientNum(cl - svs.clients);
+
+    Cmd_TokenizeString(Cmd_Args());
+
+    cl2 = SV_GetPlayerByHandle();
+    // return if no client2 or if both players are the same
+    if (!cl2 || cl2 == cl) {
+        return;
+    }
+    ps2 = SV_GameClientNum(cl2 - svs.clients);
+
+    // switch clients positions
+    vec3_t tmp;
+    VectorCopy(ps2->origin, tmp);
+    VectorCopy(ps->origin, ps2->origin);
+    VectorCopy(tmp, ps->origin);
+
+    Com_Printf("Positions of players %s ^7and %s ^7were switched.\n", cl->name, cl2->name);
+    SV_SendServerCommand(cl, "cchat \"\" \"%s^7Your position has been ^2switched ^7with: %s\"", sv_tellprefix->string, cl2->colourName);
+    SV_SendServerCommand(cl2, "cchat \"\" \"%s^7Your position has been ^2switched ^7with: %s\"", sv_tellprefix->string, cl->colourName);
+
+    VectorClear(ps->velocity);
+    VectorClear(ps2->velocity);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_SetHealth_f
+/////////////////////////////////////////////////////////////////////
+static void SV_SetHealth_f(void) {
+
+	client_t      *cl;
+    int           value;
+
+	if(!com_sv_running->integer) {
+		Com_Printf("Server is not running\n");
+	}
+
+	if(Cmd_Argc() < 3) {
+        Com_Printf("Usage: sethealth <player> <value>\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(cl == NULL)
+		return;
+
+	if (sscanf(Cmd_Argv(2), "%d", &value) == 0) {
+		Com_Printf("Invalid value.\n");
+		return;
+	}
+	MOD_SetHealth(cl, value);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_AddHealth_f
+/////////////////////////////////////////////////////////////////////
+static void SV_AddHealth_f(void) {
+
+	client_t      *cl;
+    int           value;
+
+	if(!com_sv_running->integer) {
+		Com_Printf("Server is not running\n");
+	}
+
+	if(Cmd_Argc() < 3) {
+		Com_Printf("Usage: addhealth <player> <value>\n");
+		return;
+	}
+
+	cl = SV_GetPlayerByHandle();
+	if(cl == NULL)
+		return;
+
+	if (sscanf(Cmd_Argv(2), "%d", &value) == 0) {
+		Com_Printf("Invalid value.\n");
+		return;
+	}
+	MOD_AddHealth(cl, value);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_AutoHealth_f
+/////////////////////////////////////////////////////////////////////
+void SV_AutoHealth_f(void)
+{
+    if(!com_sv_running->integer)
+    {
+        Com_Printf("Server is not running\n");
+        return;
+    }
+    client_t *cl;
+
+    cl = SV_GetPlayerByHandle();
+
+    if(!cl)
+        return;
+
+    if(Cmd_Argc() == 2)
+    {
+        cl->cm.perPlayerHealth = 0;
+        return;
+    }
+
+    if(Cmd_Argc() < 7)
+    {
+        Com_Printf("Usage: autohealth <player> <limit> <moving> <step> <timeout> <turnoffwhenfinish>\n");
+        return;
+    }
+
+    cl->cm.perPlayerHealth = 1;
+    cl->cm.turnOffUsed = 0;
+    cl->cm.limitHealth = atoi(Cmd_Argv(2));
+    cl->cm.whenmovingHealth = atoi(Cmd_Argv(3));
+    cl->cm.stepHealth = atoi(Cmd_Argv(4));
+    cl->cm.timeoutHealth = atoi(Cmd_Argv(5));
+    cl->cm.turnOffWhenFinish = atoi(Cmd_Argv(6));
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_QVMReload_f
+/////////////////////////////////////////////////////////////////////
+static void SV_QVMReload_f (void)
+{
+	if(!com_sv_running->integer) {
+		Com_Printf("Server is not running\n");
+		return;
+	}
+	if(overrideQVMData())
+	{
+		Com_Printf("Reloaded correctly!\n");
+	}
+	else
+	{
+		Com_Printf("Unable to modify qvm data!\n");
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
 // SV_ResquestDownload_f
 /////////////////////////////////////////////////////////////////////
 static void SV_ResquestDownload_f (void)
@@ -1678,6 +2367,182 @@ static void SV_ResquestDownload_f (void)
 	}
 
 	 MOD_ResquestPk3DownloadByClientGameState (cl, Cmd_Argv(2));
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_CheckWeaponOffset_f
+/////////////////////////////////////////////////////////////////////
+void SV_CheckOffset_f (void)
+{
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running\n");
+		return;
+	}
+
+	if(Cmd_Argc() < 3)
+	{
+		Com_Printf("Usage: dumpoffset <offset> <size>\n");
+		return;
+	}
+
+	//Dump all data of a given weapon
+	int offset = atoi(Cmd_Argv(1));
+	int size = atoi(Cmd_Argv(2));
+
+	FILE *f = fopen("qvmoffset.txt", "a");
+	int i;
+
+	if(!f)
+	{
+		Com_Printf("Could not open the file!\n");
+		return;
+	}
+
+	void* startPosition = (int *)VM_ArgPtr((offset));
+
+	for(i = 0; i < size; i++)
+	{
+		fprintf(f, "[%d] c %c d %d i %i \n", (offset+i), *((char*)(startPosition+i)),*((int*)(startPosition+i)),*((int*)(startPosition+i)));
+	}
+	fclose(f);
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_CheckGOffset_f
+/////////////////////////////////////////////////////////////////////
+void SV_CheckGOffset_f (void)
+{
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running\n");
+		return;
+	}
+
+	if(Cmd_Argc() < 4)
+	{
+		Com_Printf("Usage: dumpgoffset <player> <offset> <size>\n");
+		return;
+	}
+
+	client_t *cl;
+	cl = SV_GetPlayerByHandle();
+	if(!cl)
+		return;
+
+	playerState_t *ps;
+	ps = SV_GameClientNum(cl - svs.clients);
+
+	//Dump all data
+	int offset = atoi(Cmd_Argv(2));
+	int size = atoi(Cmd_Argv(3));
+
+	FILE *f = fopen("gdump.txt", "a");
+	int i;
+
+	if(!f)
+	{
+		Com_Printf("Could not open the file!\n");
+		return;
+	}
+
+	void* startPosition = (ps+offset);
+
+	for(i = 0; i < size; i++)
+	{
+		fprintf(f, "[%d] c %c d %d \n", (offset+i), *((char*)(startPosition+i)),*((int*)(startPosition+i)));
+	}
+	fclose(f);
+}
+
+
+/////////////////////////////////////////////////////////////////////
+// SV_Location_f
+/////////////////////////////////////////////////////////////////////
+void SV_Location_f (void)
+{
+	if(!com_sv_running->integer)
+	{
+		Com_Printf("Server is not running!\n");
+		return;
+	}
+	if(Cmd_Argc() < 4)
+	{
+		Com_Printf("Usage: location <player/all> <string> <index> <lock>\n");
+		return;
+	}
+
+	int j;
+	client_t *cl;
+
+	//Check index
+	int index = atoi(Cmd_Argv(3));
+	if(index >= 0 && 360 > index)
+	{
+		if(Q_strncmp(Cmd_Argv(1), "all", 3) == 0)
+		{
+			for (j = 0, cl = svs.clients; j < sv_maxclients->integer ; j++, cl++)
+			{
+				MOD_SendCustomLocation(cl, Cmd_Argv(2), index);
+				if(atoi(Cmd_Argv(4)))
+				{
+					MOD_ChangeLocation(cl, index, 1);
+				}else
+				{
+					cl->cm.locationLocked = 0;
+				}
+			}
+			return;
+		}
+
+		cl = SV_GetPlayerByHandle();
+		if(!cl)
+			return;
+		MOD_SendCustomLocation(cl, Cmd_Argv(2),  index);
+		if(atoi(Cmd_Argv(4)))
+		{
+			MOD_ChangeLocation(cl, index, 1);
+		}else
+		{
+			cl->cm.locationLocked = 0;
+		}
+	}else{
+		Com_Printf("Index must be between 0 and 360\n");
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Freeze_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Freeze_f(void) {
+
+    client_t *cl;
+
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running\n");
+        return;
+    }
+
+    if (Cmd_Argc() < 2) {
+        Com_Printf("Usage: freeze <player>\n");
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        return;
+    }
+
+    if (cl->cm.frozen > 0) {
+        cl->cm.frozen = 0;
+        Com_Printf("Player %s ^7Thawed.\n", cl->name);
+        SV_SendServerCommand(cl, "cchat \"\" \"%s^7You have been ^2thawed^7!\"", sv_tellprefix->string);
+
+    } else {
+        cl->cm.frozen = 1;
+        Com_Printf("Player %s ^7Frozen.\n", cl->name);
+        SV_SendServerCommand(cl, "cchat \"\" \"%s^7You have been ^1frozen^7!\"", sv_tellprefix->string);
+    }
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1718,6 +2583,40 @@ static void SV_SendClientCommand_f(void) {
         // send the command to the client
         SV_SendServerCommand(cl, "%s", cmd); 
     }
+}
+
+/////////////////////////////////////////////////////////////////////
+// SV_Spoof_f
+/////////////////////////////////////////////////////////////////////
+static void SV_Spoof_f(void) {
+
+    char      *cmd;
+    client_t  *cl;
+
+    // make sure server is running
+    if (!com_sv_running->integer) {
+        Com_Printf("Server is not running\n");
+        return;
+    }
+
+    // check for correct parameters
+    if (Cmd_Argc() < 3 || !strlen(Cmd_Argv(2))) {
+        Com_Printf("Usage: spoof <player> <command>\n");
+        return;
+    }
+
+    // search the client
+    cl = SV_GetPlayerByHandle();
+    if (!cl) {
+        return;
+    }
+
+    // get the command
+    cmd = Cmd_ArgsFromRaw(2);
+    Cmd_TokenizeString(cmd);
+
+    // send the command
+    VM_Call(gvm, GAME_CLIENT_COMMAND, cl - svs.clients);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1825,6 +2724,69 @@ void SV_ChangeAuth_f (void)
 		return;
 
 	Q_strncpyz(cl->cm.authcl, Cmd_Argv(2), MAX_NAME_LENGTH);
+}
+
+void SV_InfiniteStamina_fc(void)
+{
+    client_t *cl;
+
+    if (!com_sv_running->integer)
+        return;
+
+    if (Cmd_Argc() != 3) {
+        Com_Printf("Usage: infinitestamina <player> <integer>\n");
+        Com_Printf("0 = Default config; 1 = Enable; 2 = Disable\n");
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl)
+        return;
+
+    if (Cvar_VariableIntegerValue("g_stamina") == 2) {
+        Com_Printf("Warning: g_stamina is 2.\n");
+        //return;
+    }
+
+    cl->cm.infiniteStamina = atoi(Cmd_Argv(2));
+}
+
+void SV_InfiniteWallJumps_fc(void)
+{
+    client_t *cl;
+
+    if (!com_sv_running->integer)
+        return;
+
+    if (Cmd_Argc() != 3) {
+        Com_Printf("Usage: infinitewalljumps <player> <integer>\n");
+        Com_Printf("0 = Default config; 1 = Enable; 2 = Disable\n");
+        return;
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl)
+        return;
+
+    cl->cm.infiniteWallJumps = atoi(Cmd_Argv(2));
+}
+
+void SV_IsJumpTimerEnabled(void)
+{
+    client_t *cl;
+
+    if (!com_sv_running->integer)
+        return;
+
+    if (Cmd_Argc() != 2) {
+        Com_Printf("Usage: isJumpTimerOn <player>");
+    }
+
+    cl = SV_GetPlayerByHandle();
+    if (!cl)
+        return;
+
+    Com_Printf("%d\n", cl->cm.ready);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -2523,13 +3485,43 @@ void SV_AddOperatorCommands( void ) {
 #endif
 
     // TitanMod Cmds
+    Cmd_AddCommand ("setscore", SV_SetScore_f);
+    Cmd_AddCommand ("setdeaths", SV_SetDeaths_f);
+    Cmd_AddCommand ("invisible", SV_Invisible_f);
     Cmd_AddCommand ("playsoundfile", SV_PlaySoundFile_f);
     Cmd_AddCommand ("playsound", SV_PlaySound_f);
+    Cmd_AddCommand ("giveweapon", SV_GiveWeapon_f);
+    Cmd_AddCommand ("gw", SV_GiveWeapon_f);
+    Cmd_AddCommand ("removeweapon", SV_RemoveWeapon_f);
+    Cmd_AddCommand ("rw", SV_RemoveWeapon_f);
+    Cmd_AddCommand ("giveitem", SV_GiveItem_f);
+    Cmd_AddCommand ("gi", SV_GiveItem_f);
+    Cmd_AddCommand ("removeitem", SV_RemoveItem_f);
+    Cmd_AddCommand ("ri", SV_RemoveItem_f);
+	Cmd_AddCommand ("giveclips", SV_GiveClips_f);
+	Cmd_AddCommand ("givebullets", SV_GiveBullets_f);
+	Cmd_AddCommand ("setclips", SV_SetClips_f);
+	Cmd_AddCommand ("setbullets", SV_SetBullets_f);
+	Cmd_AddCommand ("addhealth", SV_AddHealth_f);
+	Cmd_AddCommand ("sethealth", SV_SetHealth_f);
+    Cmd_AddCommand ("autohealth", SV_AutoHealth_f);
+	Cmd_AddCommand ("teleport", SV_Teleport_f);
+    Cmd_AddCommand ("switch", SV_Switch_f);
+    Cmd_AddCommand ("tp", SV_Teleport_f);
     Cmd_AddCommand ("resquestdownload", SV_ResquestDownload_f);
+    Cmd_AddCommand ("dumpoffset", SV_CheckOffset_f);
+    Cmd_AddCommand ("dumpgoffset", SV_CheckGOffset_f);
+    Cmd_AddCommand ("location", SV_Location_f);
+    Cmd_AddCommand ("qvmreload", SV_QVMReload_f);
+    Cmd_AddCommand ("freeze", SV_Freeze_f);
     Cmd_AddCommand ("sendclientcommand", SV_SendClientCommand_f);
     Cmd_AddCommand ("scc", SV_SendClientCommand_f);
+    Cmd_AddCommand ("spoof", SV_Spoof_f);
     Cmd_AddCommand ("forcecvar", SV_ForceCvar_f);
     Cmd_AddCommand ("changeauth", SV_ChangeAuth_f);
+    Cmd_AddCommand ("infinitestamina", SV_InfiniteStamina_fc);
+    Cmd_AddCommand ("infinitewalljumps", SV_InfiniteWallJumps_fc);
+    Cmd_AddCommand ("isJumpTimerOn", SV_IsJumpTimerEnabled);
 
 	// B3 specific commands (used with the custom chat)
     Cmd_AddCommand ("setuser", SV_Setuser_f);

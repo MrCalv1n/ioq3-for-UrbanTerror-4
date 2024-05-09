@@ -34,7 +34,6 @@ BUILD_GAME_SO    =0
 BUILD_GAME_QVM   =0
 OPTIMIZE         =1
 USE_SDL          =1
-
 USE_OPENAL       =0
 USE_CURL         =1
 USE_CODEC_VORBIS =0
@@ -174,6 +173,9 @@ TOOLSDIR=$(MOUNT_DIR)/tools
 LOKISETUPDIR=$(UDIR)/setup
 SDLHDIR=$(MOUNT_DIR)/SDL12
 LIBSDIR=$(MOUNT_DIR)/libs
+D3BRDIR=$(MOUNT_DIR)/battle_royale
+D31V1DIR=$(MOUNT_DIR)/1v1_arena
+
 
 # extract version info
 VERSION=$(shell grep "\#define Q3_VERSION" $(CMDIR)/q_shared.h | \
@@ -855,7 +857,7 @@ endif #SunOS
 TARGETS =
 
 ifneq ($(BUILD_SERVER),0)
-  TARGETS += $(B)/Quake3-UrT-Ded.$(ARCH)$(BINEXT)
+  TARGETS += $(B)/titanMod.$(ARCH)$(BINEXT)
 endif
 
 ifneq ($(BUILD_CLIENT),0)
@@ -921,17 +923,17 @@ ifeq ($(USE_SVN),1)
 endif
 
 define DO_CC       
-$(echo_cmd) "CC $<"
+$(echo_cmd) "[\033[34mCLIENT\033[0m] $<"
 $(Q)$(CC) $(NOTSHLIBCFLAGS) $(CFLAGS) -o $@ -c $<
 endef
 
 define DO_SMP_CC
-$(echo_cmd) "SMP_CC $<"
+$(echo_cmd) "[\033[34mSMP\033[0m] $<"
 $(Q)$(CC) $(NOTSHLIBCFLAGS) $(CFLAGS) -DSMP -o $@ -c $<
 endef
 
 define DO_BOT_CC
-$(echo_cmd) "BOT_CC $<"
+$(echo_cmd) "[\033[35mBOT\033[0m] $<"
 $(Q)$(CC) $(NOTSHLIBCFLAGS) $(CFLAGS) $(BOTCFLAGS) -DBOTLIB -o $@ -c $<
 endef
 
@@ -940,24 +942,24 @@ ifeq ($(GENERATE_DEPENDENCIES),1)
 endif
 
 define DO_SHLIB_CC
-$(echo_cmd) "SHLIB_CC $<"
+$(echo_cmd) "[\033[34mSHLIB\033[0m] $<"
 $(Q)$(CC) $(CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
 $(Q)$(DO_QVM_DEP)
 endef
 
 define DO_SHLIB_CC_MISSIONPACK
-$(echo_cmd) "SHLIB_CC_MISSIONPACK $<"
+$(echo_cmd) "[\033[34mMISSIONPACK\033[0m] $<"
 $(Q)$(CC) -DMISSIONPACK $(CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
 $(Q)$(DO_QVM_DEP)
 endef
 
 define DO_AS
-$(echo_cmd) "AS $<"
+$(echo_cmd) "[\033[34mAS\033[0m] $<"
 $(Q)$(CC) $(CFLAGS) -DELF -x assembler-with-cpp -o $@ -c $<
 endef
 
 define DO_DED_CC
-$(echo_cmd) "DED_CC $<"
+$(echo_cmd) "[\033[34mSERVER\033[0m] $<"
 $(Q)$(CC) $(NOTSHLIBCFLAGS) -DDEDICATED $(CFLAGS) -o $@ -c $<
 endef
 
@@ -988,7 +990,7 @@ endif
 # an informational message, then start building
 targets: makedirs tools
 	@echo ""
-	@echo "Building Quake3-UrT in $(B):"
+	@echo "Building TitanMod in $(B):"
 	@echo "  PLATFORM: $(PLATFORM)"
 	@echo "  ARCH: $(ARCH)"
 	@echo "  COMPILE_PLATFORM: $(COMPILE_PLATFORM)"
@@ -1119,6 +1121,7 @@ Q3OBJ = \
   $(B)/client/sv_net_chan.o \
   $(B)/client/sv_snapshot.o \
   $(B)/client/sv_world.o \
+  $(B)/client/sv_weapon.o \
   $(B)/client/qvm_offsets.o \
   \
   $(B)/client/q_math.o \
@@ -1392,6 +1395,11 @@ Q3DOBJ = \
   $(B)/ded/null_client.o \
   $(B)/ded/null_input.o \
   $(B)/ded/null_snddma.o \
+  \
+  $(B)/ded/battleroyale.o \
+  \
+  $(B)/ded/1v1arena.o \
+  \
 
 ifeq ($(PLATFORM),mingw32)
   Q3DOBJ += \
@@ -1444,7 +1452,7 @@ ifeq ($(HAVE_VM_COMPILED),true)
   endif
 endif
 
-$(B)/Quake3-UrT-Ded.$(ARCH)$(BINEXT): $(Q3DOBJ)
+$(B)/titanMod.$(ARCH)$(BINEXT): $(Q3DOBJ)
 	$(echo_cmd) "LD $@"
 	$(Q)$(CC) -o $@ $(Q3DOBJ) $(LDFLAGS)
 
@@ -1789,6 +1797,12 @@ $(B)/ded/%.o: $(W32DIR)/%.c
 $(B)/ded/%.o: $(SYSDIR)/%.c
 	$(DO_DED_CC)
 
+$(B)/ded/%.o: $(D3BRDIR)/%.c
+	$(DO_DED_CC)
+
+$(B)/ded/%.o: $(D31V1DIR)/%.c
+	$(DO_DED_CC)
+
 # Extra dependencies to ensure the SVN version is incorporated
 ifeq ($(USE_SVN),1)
   $(B)/client/cl_console.o : .svn/entries
@@ -1872,8 +1886,8 @@ endif
 #endif
 
 ifneq ($(BUILD_SERVER),0)
-	@if [ -f $(BR)/Quake3-UrT-Ded.$(ARCH)$(BINEXT) ]; then \
-		$(INSTALL) -s -m 0755 $(BR)/Quake3-UrT-Ded.$(ARCH)$(BINEXT) $(COPYDIR)/Quake3-UrT-Ded.$(ARCH)$(BINEXT); \
+	@if [ -f $(BR)/titanMod.$(ARCH)$(BINEXT) ]; then \
+		$(INSTALL) -s -m 0755 $(BR)/titanMod.$(ARCH)$(BINEXT) $(COPYDIR)/titanMod.$(ARCH)$(BINEXT); \
 	fi
 endif
 

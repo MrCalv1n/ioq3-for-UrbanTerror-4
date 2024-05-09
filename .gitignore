@@ -6,4 +6,3 @@ build/*
 .settings/org.eclipse.cdt.managedbuilder.core.prefs
 .idea
 CMakeLists.txt
-.vscode/*
