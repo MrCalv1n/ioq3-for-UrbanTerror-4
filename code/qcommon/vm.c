@@ -34,6 +34,7 @@ and one exported function: Perform
 */
 
 #include "vm_local.h"
+#include "../server/server.h"
 
 vm_t *currentVM = NULL;
 vm_t *lastVM = NULL;
