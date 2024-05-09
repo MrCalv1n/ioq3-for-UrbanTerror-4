@@ -857,7 +857,7 @@ endif #SunOS
 TARGETS =
 
 ifneq ($(BUILD_SERVER),0)
-  TARGETS += $(B)/titanMod.$(ARCH)$(BINEXT)
+  TARGETS += $(B)/Quake3-UrT.$(ARCH)$(BINEXT)
 endif
 
 ifneq ($(BUILD_CLIENT),0)
@@ -990,7 +990,7 @@ endif
 # an informational message, then start building
 targets: makedirs tools
 	@echo ""
-	@echo "Building TitanMod in $(B):"
+	@echo "Building Quake3-UrT in $(B):"
 	@echo "  PLATFORM: $(PLATFORM)"
 	@echo "  ARCH: $(ARCH)"
 	@echo "  COMPILE_PLATFORM: $(COMPILE_PLATFORM)"
@@ -1452,7 +1452,7 @@ ifeq ($(HAVE_VM_COMPILED),true)
   endif
 endif
 
-$(B)/titanMod.$(ARCH)$(BINEXT): $(Q3DOBJ)
+$(B)/Quake3-UrT.$(ARCH)$(BINEXT): $(Q3DOBJ)
 	$(echo_cmd) "LD $@"
 	$(Q)$(CC) -o $@ $(Q3DOBJ) $(LDFLAGS)
 
@@ -1886,8 +1886,8 @@ endif
 #endif
 
 ifneq ($(BUILD_SERVER),0)
-	@if [ -f $(BR)/titanMod.$(ARCH)$(BINEXT) ]; then \
-		$(INSTALL) -s -m 0755 $(BR)/titanMod.$(ARCH)$(BINEXT) $(COPYDIR)/titanMod.$(ARCH)$(BINEXT); \
+	@if [ -f $(BR)/Quake3-UrT.$(ARCH)$(BINEXT) ]; then \
+		$(INSTALL) -s -m 0755 $(BR)/Quake3-UrT.$(ARCH)$(BINEXT) $(COPYDIR)/Quake3-UrT.$(ARCH)$(BINEXT); \
 	fi
 endif
 

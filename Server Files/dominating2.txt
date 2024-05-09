@@ -1,0 +1,65 @@
+playsoundfile 0 /zsounds/dominating2.wav
+wait 1
+playsoundfile 1 /zsounds/dominating2.wav
+wait 1
+playsoundfile 2 /zsounds/dominating2.wav
+wait 1
+playsoundfile 3 /zsounds/dominating2.wav
+wait 1
+playsoundfile 4 /zsounds/dominating2.wav
+wait 1
+playsoundfile 5 /zsounds/dominating2.wav
+wait 1
+playsoundfile 6 /zsounds/dominating2.wav
+wait 1
+playsoundfile 7 /zsounds/dominating2.wav
+wait 1
+playsoundfile 8 /zsounds/dominating2.wav
+wait 1
+playsoundfile 9 /zsounds/dominating2.wav
+wait 1
+playsoundfile 10 /zsounds/dominating2.wav
+wait 1
+playsoundfile 11 /zsounds/dominating2.wav
+wait 1
+playsoundfile 12 /zsounds/dominating2.wav
+wait 1
+playsoundfile 13 /zsounds/dominating2.wav
+wait 1
+playsoundfile 14 /zsounds/dominating2.wav
+wait 1
+playsoundfile 15 /zsounds/dominating2.wav
+wait 1
+playsoundfile 16 /zsounds/dominating2.wav
+wait 1
+playsoundfile 17 /zsounds/dominating2.wav
+wait 1
+playsoundfile 18 /zsounds/dominating2.wav
+wait 1
+playsoundfile 19 /zsounds/dominating2.wav
+wait 1
+playsoundfile 20 /zsounds/dominating2.wav
+wait 1
+playsoundfile 21 /zsounds/dominating2.wav
+wait 1
+playsoundfile 22 /zsounds/dominating2.wav
+wait 1
+playsoundfile 23 /zsounds/dominating2.wav
+wait 1
+playsoundfile 24 /zsounds/dominating2.wav
+wait 1
+playsoundfile 25 /zsounds/dominating2.wav
+wait 1
+playsoundfile 26 /zsounds/dominating2.wav
+wait 1
+playsoundfile 27 /zsounds/dominating2.wav
+wait 1
+playsoundfile 28 /zsounds/dominating2.wav
+wait 1
+playsoundfile 29 /zsounds/dominating2.wav
+wait 1
+playsoundfile 30 /zsounds/dominating2.wav
+wait 1
+playsoundfile 31 /zsounds/dominating2.wav
+wait 1
+playsoundfile 32 /zsounds/dominating2.wav

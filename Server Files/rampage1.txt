@@ -1,0 +1,65 @@
+playsoundfile 0 /zsounds/rampage.wav
+wait 1
+playsoundfile 1 /zsounds/rampage.wav
+wait 1
+playsoundfile 2 /zsounds/rampage.wav
+wait 1
+playsoundfile 3 /zsounds/rampage.wav
+wait 1
+playsoundfile 4 /zsounds/rampage.wav
+wait 1
+playsoundfile 5 /zsounds/rampage.wav
+wait 1
+playsoundfile 6 /zsounds/rampage.wav
+wait 1
+playsoundfile 7 /zsounds/rampage.wav
+wait 1
+playsoundfile 8 /zsounds/rampage.wav
+wait 1
+playsoundfile 9 /zsounds/rampage.wav
+wait 1
+playsoundfile 10 /zsounds/rampage.wav
+wait 1
+playsoundfile 11 /zsounds/rampage.wav
+wait 1
+playsoundfile 12 /zsounds/rampage.wav
+wait 1
+playsoundfile 13 /zsounds/rampage.wav
+wait 1
+playsoundfile 14 /zsounds/rampage.wav
+wait 1
+playsoundfile 15 /zsounds/rampage.wav
+wait 1
+playsoundfile 16 /zsounds/rampage.wav
+wait 1
+playsoundfile 17 /zsounds/rampage.wav
+wait 1
+playsoundfile 18 /zsounds/rampage.wav
+wait 1
+playsoundfile 19 /zsounds/rampage.wav
+wait 1
+playsoundfile 20 /zsounds/rampage.wav
+wait 1
+playsoundfile 21 /zsounds/rampage.wav
+wait 1
+playsoundfile 22 /zsounds/rampage.wav
+wait 1
+playsoundfile 23 /zsounds/rampage.wav
+wait 1
+playsoundfile 24 /zsounds/rampage.wav
+wait 1
+playsoundfile 25 /zsounds/rampage.wav
+wait 1
+playsoundfile 26 /zsounds/rampage.wav
+wait 1
+playsoundfile 27 /zsounds/rampage.wav
+wait 1
+playsoundfile 28 /zsounds/rampage.wav
+wait 1
+playsoundfile 29 /zsounds/rampage.wav
+wait 1
+playsoundfile 30 /zsounds/rampage.wav
+wait 1
+playsoundfile 31 /zsounds/rampage.wav
+wait 1
+playsoundfile 32 /zsounds/rampage.wav

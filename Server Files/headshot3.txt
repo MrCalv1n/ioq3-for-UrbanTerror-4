@@ -1,0 +1,65 @@
+playsoundfile 0 /zsounds/headshot3.wav
+wait 1
+playsoundfile 1 /zsounds/headshot3.wav
+wait 1
+playsoundfile 2 /zsounds/headshot3.wav
+wait 1
+playsoundfile 3 /zsounds/headshot3.wav
+wait 1
+playsoundfile 4 /zsounds/headshot3.wav
+wait 1
+playsoundfile 5 /zsounds/headshot3.wav
+wait 1
+playsoundfile 6 /zsounds/headshot3.wav
+wait 1
+playsoundfile 7 /zsounds/headshot3.wav
+wait 1
+playsoundfile 8 /zsounds/headshot3.wav
+wait 1
+playsoundfile 9 /zsounds/headshot3.wav
+wait 1
+playsoundfile 10 /zsounds/headshot3.wav
+wait 1
+playsoundfile 11 /zsounds/headshot3.wav
+wait 1
+playsoundfile 12 /zsounds/headshot3.wav
+wait 1
+playsoundfile 13 /zsounds/headshot3.wav
+wait 1
+playsoundfile 14 /zsounds/headshot3.wav
+wait 1
+playsoundfile 15 /zsounds/headshot3.wav
+wait 1
+playsoundfile 16 /zsounds/headshot3.wav
+wait 1
+playsoundfile 17 /zsounds/headshot3.wav
+wait 1
+playsoundfile 18 /zsounds/headshot3.wav
+wait 1
+playsoundfile 19 /zsounds/headshot3.wav
+wait 1
+playsoundfile 20 /zsounds/headshot3.wav
+wait 1
+playsoundfile 21 /zsounds/headshot3.wav
+wait 1
+playsoundfile 22 /zsounds/headshot3.wav
+wait 1
+playsoundfile 23 /zsounds/headshot3.wav
+wait 1
+playsoundfile 24 /zsounds/headshot3.wav
+wait 1
+playsoundfile 25 /zsounds/headshot3.wav
+wait 1
+playsoundfile 26 /zsounds/headshot3.wav
+wait 1
+playsoundfile 27 /zsounds/headshot3.wav
+wait 1
+playsoundfile 28 /zsounds/headshot3.wav
+wait 1
+playsoundfile 29 /zsounds/headshot3.wav
+wait 1
+playsoundfile 30 /zsounds/headshot3.wav
+wait 1
+playsoundfile 31 /zsounds/headshot3.wav
+wait 1
+playsoundfile 32 /zsounds/headshot3.wav

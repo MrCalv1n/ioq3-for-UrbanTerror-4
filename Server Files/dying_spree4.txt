@@ -1,0 +1,65 @@
+playsoundfile 0 /zsounds/cricket.wav
+wait 1
+playsoundfile 1 /zsounds/cricket.wav
+wait 1
+playsoundfile 2 /zsounds/cricket.wav
+wait 1
+playsoundfile 3 /zsounds/cricket.wav
+wait 1
+playsoundfile 4 /zsounds/cricket.wav
+wait 1
+playsoundfile 5 /zsounds/cricket.wav
+wait 1
+playsoundfile 6 /zsounds/cricket.wav
+wait 1
+playsoundfile 7 /zsounds/cricket.wav
+wait 1
+playsoundfile 8 /zsounds/cricket.wav
+wait 1
+playsoundfile 9 /zsounds/cricket.wav
+wait 1
+playsoundfile 10 /zsounds/cricket.wav
+wait 1
+playsoundfile 11 /zsounds/cricket.wav
+wait 1
+playsoundfile 12 /zsounds/cricket.wav
+wait 1
+playsoundfile 13 /zsounds/cricket.wav
+wait 1
+playsoundfile 14 /zsounds/cricket.wav
+wait 1
+playsoundfile 15 /zsounds/cricket.wav
+wait 1
+playsoundfile 16 /zsounds/cricket.wav
+wait 1
+playsoundfile 17 /zsounds/cricket.wav
+wait 1
+playsoundfile 18 /zsounds/cricket.wav
+wait 1
+playsoundfile 19 /zsounds/cricket.wav
+wait 1
+playsoundfile 20 /zsounds/cricket.wav
+wait 1
+playsoundfile 21 /zsounds/cricket.wav
+wait 1
+playsoundfile 22 /zsounds/cricket.wav
+wait 1
+playsoundfile 23 /zsounds/cricket.wav
+wait 1
+playsoundfile 24 /zsounds/cricket.wav
+wait 1
+playsoundfile 25 /zsounds/cricket.wav
+wait 1
+playsoundfile 26 /zsounds/cricket.wav
+wait 1
+playsoundfile 27 /zsounds/cricket.wav
+wait 1
+playsoundfile 28 /zsounds/cricket.wav
+wait 1
+playsoundfile 29 /zsounds/cricket.wav
+wait 1
+playsoundfile 30 /zsounds/cricket.wav
+wait 1
+playsoundfile 31 /zsounds/cricket.wav
+wait 1
+playsoundfile 32 /zsounds/cricket.wav

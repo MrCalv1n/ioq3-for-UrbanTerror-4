@@ -1,0 +1,65 @@
+playsoundfile 0 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 1 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 2 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 3 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 4 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 5 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 6 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 7 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 8 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 9 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 10 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 11 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 12 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 13 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 14 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 15 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 16 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 17 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 18 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 19 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 20 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 21 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 22 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 23 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 24 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 25 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 26 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 27 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 28 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 29 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 30 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 31 /zsounds/prepareforbattle.wav
+wait 1
+playsoundfile 32 /zsounds/prepareforbattle.wav

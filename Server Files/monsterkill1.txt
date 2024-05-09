@@ -1,0 +1,65 @@
+playsoundfile 0 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 1 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 2 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 3 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 4 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 5 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 6 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 7 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 8 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 9 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 10 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 11 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 12 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 13 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 14 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 15 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 16 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 17 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 18 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 19 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 20 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 21 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 22 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 23 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 24 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 25 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 26 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 27 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 28 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 29 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 30 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 31 /zsounds/monsterkill.wav
+wait 1
+playsoundfile 32 /zsounds/monsterkill.wav

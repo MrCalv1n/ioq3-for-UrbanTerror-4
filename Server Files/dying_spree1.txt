@@ -1,0 +1,65 @@
+playsoundfile 0 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 1 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 2 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 3 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 4 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 5 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 6 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 7 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 8 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 9 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 10 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 11 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 12 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 13 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 14 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 15 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 16 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 17 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 18 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 19 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 20 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 21 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 22 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 23 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 24 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 25 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 26 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 27 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 28 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 29 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 30 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 31 /zsounds/yourefunny.wav
+wait 1
+playsoundfile 32 /zsounds/yourefunny.wav
