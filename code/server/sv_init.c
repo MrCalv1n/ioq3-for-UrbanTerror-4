@@ -1290,6 +1290,8 @@ void SV_Init(void)
 	mod_levelsystem = Cvar_Get("mod_levelsystem", "0", CVAR_ARCHIVE);
 	sv_TurnpikeBlocker = Cvar_Get("sv_TurnpikeBlocker", "0", CVAR_ARCHIVE);
 	sv_modRocketJump = Cvar_Get("sv_modRocketJump", "0", CVAR_ARCHIVE);
+	sv_camperloop = Cvar_Get("sv_camperloop", "7", CVAR_ARCHIVE);
+	sv_campercounter = Cvar_Get("sv_campercounter", "3000", CVAR_ARCHIVE);
 	sv_ghostOnRoundstart = Cvar_Get("sv_ghostOnRoundstart", "0", CVAR_ARCHIVE);
 
 	mod_announceNoscopes = Cvar_Get("mod_announceNoscopes", "0", CVAR_ARCHIVE);

@@ -134,9 +134,9 @@ typedef struct
 
 typedef enum
 {
-	CS_FREE,   // can be reused for a new connection
-	CS_ZOMBIE, // client has been disconnected, but don't reuse
-			   // connection for a couple seconds
+	CS_FREE,	  // can be reused for a new connection
+	CS_ZOMBIE,	  // client has been disconnected, but don't reuse
+				  // connection for a couple seconds
 	CS_CONNECTED, // has been assigned to a client_t, but no gamestate yet
 	CS_PRIMED,	  // gamestate has been sent, but client hasn't sent a usercmd
 	CS_ACTIVE	  // client is fully in game
@@ -450,6 +450,8 @@ extern cvar_t *sv_floodProtect;
 extern cvar_t *sv_lanForceRate;
 extern cvar_t *sv_strictAuth;
 extern cvar_t *sv_clientsPerIp;
+extern cvar_t *sv_camperloop;
+extern cvar_t *sv_campercounter;
 
 extern cvar_t *sv_demonotice;
 extern cvar_t *sv_sayprefix;

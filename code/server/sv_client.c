@@ -3454,14 +3454,15 @@ void checkCampers(client_t *cl)
 	{
 		// Now check if 10 seconds have passed since the 1st check, if so do a proximity check
 		// if the client is still close to his previous coordinates.
-		if ((time - cl->timechecked) > 3000)
+
+		if ((time - cl->timechecked) > sv_camperloop->integer)
 		{
 			cl->timechecked = time;
 			// 3 seconds have passed since the last check
 			if (checkCamperLocation(cl, ps, 400) == 1)
 			{
 				// Client is still within his previous radius,
-				if (cl->campcounter == 7)
+				if (cl->campcounter == sv_campercounter->integer)
 				{
 					// punish now
 
