@@ -3024,7 +3024,7 @@ void SV_CamperMode_fc(void)
 
     Cvar_Set("mod_punishCampers", Cmd_Argv(1));
     Cvar_Set("sv_camperloop", Cmd_Argv(2));
-    Cvar_Set("sv_campercount", Cmd_Argv(3));
+    Cvar_Set("sv_campercounter", Cmd_Argv(3));
 }
 
 void SV_InfiniteWallJumps_fc(void)
